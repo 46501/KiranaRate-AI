@@ -196,6 +196,10 @@ class BaseStore(ABC):
     def get_purchases_by_bill(self, bill_id: str) -> list[Purchase]:
         """Return all Purchase records for the given ``bill_id``."""
 
+    def list_purchases(self, limit: int = 50) -> list[Purchase]:
+        """Return recently posted purchases (up to limit)."""
+        return []
+
     @abstractmethod
     def get_purchases_for_sku_since(
         self,
@@ -244,6 +248,10 @@ class BaseStore(ABC):
         Return the oldest Alert (by ``created_at``) whose status is PENDING
         and whose parent bill has status POSTED, or ``None`` if none exist.
         """
+
+    def list_alerts(self, limit: int = 50) -> list[Alert]:
+        """Return all alerts ordered by creation date descending (up to limit)."""
+        return []
 
     @abstractmethod
     def update_alert(self, alert_id: str, **fields) -> None:

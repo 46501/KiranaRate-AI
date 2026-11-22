@@ -849,6 +849,14 @@ class SQLiteStore(BaseStore):
         )
         return [_row_to_purchase(row) for row in cur.fetchall()]
 
+    def list_purchases(self, limit: int = 50) -> list[Purchase]:
+        """Return recently posted purchases (up to limit)."""
+        conn = self._get_conn()
+        cur = conn.execute(
+            "SELECT * FROM purchases ORDER BY posted_at DESC LIMIT ?", (limit,)
+        )
+        return [_row_to_purchase(row) for row in cur.fetchall()]
+
     def has_duplicate_invoice(
         self,
         supplier_id: str,
@@ -956,6 +964,14 @@ class SQLiteStore(BaseStore):
         )
         row = cur.fetchone()
         return _row_to_alert(row) if row else None
+
+    def list_alerts(self, limit: int = 50) -> list[Alert]:
+        """Return all alerts ordered by creation date descending (up to limit)."""
+        conn = self._get_conn()
+        cur = conn.execute(
+            "SELECT * FROM alerts ORDER BY created_at DESC LIMIT ?", (limit,)
+        )
+        return [_row_to_alert(row) for row in cur.fetchall()]
 
     def update_alert(self, alert_id: str, **fields) -> None:
         sql, params = self._build_update_sql(

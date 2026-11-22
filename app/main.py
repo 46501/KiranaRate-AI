@@ -191,6 +191,9 @@ app = FastAPI(
 # Include JSON API routes
 app.include_router(api_router, tags=["API"])
 
+# Mount media directory for invoice previews
+app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
+
 
 # ---------------------------------------------------------------------------
 # Reviewer Web UI Routes
@@ -198,8 +201,12 @@ app.include_router(api_router, tags=["API"])
 
 @app.get("/", response_class=HTMLResponse)
 @app.get("/ui/bills", response_class=HTMLResponse)
-async def ui_bills_dashboard(request: Request, status_filter: Optional[str] = None):
-    """Render dashboard listing all bills with status filtering."""
+async def ui_bills_dashboard(
+    request: Request,
+    status_filter: Optional[str] = None,
+    view: Optional[str] = None,
+):
+    """Render KiranaIQ purchase intelligence dashboard with multi-view navigation."""
     store: SQLiteStore = request.app.state.store
     filter_enum = None
     if status_filter and status_filter.upper() != "ALL":
@@ -214,6 +221,14 @@ async def ui_bills_dashboard(request: Request, status_filter: Optional[str] = No
     else:
         bills = all_bills
 
+    suppliers = store.list_suppliers()
+    products = store.list_products()
+    purchases = store.list_purchases(limit=50)
+    alerts = store.list_alerts(limit=50)
+    pending_alert = store.get_oldest_pending_alert()
+
+    active_suppliers_count = sum(1 for s in suppliers if getattr(s.active, "value", s.active) == "YES")
+
     metrics = {
         "total": len(all_bills),
         "queued": sum(1 for b in all_bills if b.status == BillStatus.QUEUED),
@@ -222,6 +237,8 @@ async def ui_bills_dashboard(request: Request, status_filter: Optional[str] = No
         "approved": sum(1 for b in all_bills if b.status == BillStatus.APPROVED),
         "posted": sum(1 for b in all_bills if b.status == BillStatus.POSTED),
         "rejected": sum(1 for b in all_bills if b.status == BillStatus.REJECTED),
+        "active_suppliers": active_suppliers_count,
+        "alerts_count": len(alerts),
     }
 
     status_counts = {
@@ -229,19 +246,36 @@ async def ui_bills_dashboard(request: Request, status_filter: Optional[str] = No
         **{s.value: sum(1 for b in all_bills if b.status == s) for s in BillStatus},
     }
 
-    pending_alert = store.get_oldest_pending_alert()
+    # Format current date in IST
+    from datetime import datetime
+    import pytz
+    ist_tz = pytz.timezone("Asia/Kolkata")
+    now_ist = datetime.now(ist_tz).strftime("%A, %d %B %Y")
+
+    # Scheduler info
+    scheduler = getattr(request.app.state, "scheduler", None)
+    scheduler_running = scheduler.running if scheduler else False
 
     return templates.TemplateResponse(
         request=request,
         name="review.html",
         context={
             "bills": bills,
+            "all_bills": all_bills,
             "status_filter": status_filter or "ALL",
             "statuses": [s.value for s in BillStatus],
             "metrics": metrics,
             "status_counts": status_counts,
             "has_pending_alert": pending_alert is not None,
             "pending_alert": pending_alert,
+            "suppliers": suppliers,
+            "products": products,
+            "purchases": purchases,
+            "alerts": alerts,
+            "current_view": view or "overview",
+            "now_ist": now_ist,
+            "scheduler_running": scheduler_running,
+            "settings": request.app.state.settings,
         },
     )
 
@@ -258,6 +292,15 @@ async def ui_bill_detail(request: Request, bill_id: str, msg: Optional[str] = No
     suppliers = store.list_suppliers(active_only=True)
     products = store.list_products(active_only=True)
 
+    # Check for image file on disk
+    image_url = None
+    media_jpg = MEDIA_DIR / f"{bill.bill_id}.jpg"
+    media_png = MEDIA_DIR / f"{bill.bill_id}.png"
+    if media_jpg.exists():
+        image_url = f"/media/{bill.bill_id}.jpg"
+    elif media_png.exists():
+        image_url = f"/media/{bill.bill_id}.png"
+
     return templates.TemplateResponse(
         request=request,
         name="bill_detail.html",
@@ -267,6 +310,7 @@ async def ui_bill_detail(request: Request, bill_id: str, msg: Optional[str] = No
             "suppliers": suppliers,
             "products": products,
             "msg": msg,
+            "image_url": image_url,
         },
     )
 

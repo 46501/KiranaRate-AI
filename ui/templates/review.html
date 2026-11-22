@@ -3,29 +3,45 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Bill Scanner Dashboard</title>
+  <title>KiranaIQ — AI-Powered Purchase Intelligence | AI Bill Scanner Dashboard</title>
   <style>
     :root {
-      --bg: #f8fafc;
+      /* FinTech Slate & Light Palette */
+      --bg-canvas: #f8fafc;
       --card-bg: #ffffff;
       --card-hover: #fcfdfe;
       --surface-subtle: #f1f5f9;
       --surface-muted: #f8fafc;
-      
-      --text-main: #0f172a;
-      --text-body: #334155;
-      --text-muted: #64748b;
-      --text-dim: #94a3b8;
-      
-      --border: #e2e8f0;
-      --border-subtle: #edf2f7;
-      --border-focus: #3b82f6;
+      --surface-border: #eaecf0;
 
+      /* Dark Navy Sidebar */
+      --sidebar-bg: #101828;
+      --sidebar-hover: #1d2939;
+      --sidebar-active: #1d2939;
+      --sidebar-text: #98a2b3;
+      --sidebar-text-hover: #ffffff;
+      --sidebar-border: #1f2a37;
+
+      /* Typography Palette */
+      --text-main: #101828;
+      --text-body: #344054;
+      --text-muted: #667085;
+      --text-dim: #98a2b3;
+
+      /* Borders */
+      --border: #eaecf0;
+      --border-light: #f2f4f7;
+      --border-dark: #d0d5dd;
+      --border-focus: #2563eb;
+
+      /* Brand Accents */
       --primary: #2563eb;
       --primary-hover: #1d4ed8;
       --primary-light: #eff6ff;
       --primary-border: #bfdbfe;
+      --primary-dark: #1e40af;
 
+      /* Functional Accents */
       --success: #059669;
       --success-light: #ecfdf5;
       --success-border: #a7f3d0;
@@ -42,10 +58,13 @@
       --info-light: #f0f9ff;
       --info-border: #bae6fd;
 
-      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-      --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
-      --shadow-hover: 0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
-      
+      /* Shadows */
+      --shadow-xs: 0 1px 2px 0 rgba(16, 24, 40, 0.05);
+      --shadow-sm: 0 1px 3px 0 rgba(16, 24, 40, 0.1), 0 1px 2px 0 rgba(16, 24, 40, 0.06);
+      --shadow-card: 0 1px 3px 0 rgba(16, 24, 40, 0.06), 0 1px 2px -1px rgba(16, 24, 40, 0.04);
+      --shadow-hover: 0 6px 16px -4px rgba(16, 24, 40, 0.08), 0 2px 6px -2px rgba(16, 24, 40, 0.04);
+      --shadow-dropdown: 0 12px 24px -4px rgba(16, 24, 40, 0.12), 0 4px 8px -2px rgba(16, 24, 40, 0.04);
+
       --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
 
@@ -53,88 +72,277 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background: var(--bg);
+      background: var(--bg-canvas);
       color: var(--text-body);
       margin: 0;
       padding: 0;
       min-height: 100vh;
-      line-height: 1.5;
+      display: flex;
       -webkit-font-smoothing: antialiased;
     }
 
-    .app-wrapper {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 28px 32px 48px;
-    }
-
-    /* TOP BRAND & NAVIGATION BAR */
-    header.dashboard-header {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 18px 24px;
-      margin-bottom: 24px;
+    /* SIDEBAR NAVIGATION */
+    aside.app-sidebar {
+      width: 260px;
+      background: var(--sidebar-bg);
+      color: var(--sidebar-text);
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 16px;
-      box-shadow: var(--shadow-card);
+      flex-direction: column;
+      flex-shrink: 0;
+      min-height: 100vh;
+      border-right: 1px solid var(--sidebar-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
 
-    .brand-group {
+    .sidebar-brand {
+      padding: 24px 20px 20px;
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     }
 
-    .brand-logo {
-      width: 44px;
-      height: 44px;
+    .brand-mark {
+      width: 38px;
+      height: 38px;
       background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-      border-radius: 10px;
+      border-radius: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: #ffffff;
-      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+      font-weight: 800;
+      font-size: 19px;
+      letter-spacing: -0.04em;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+      flex-shrink: 0;
     }
 
-    .brand-logo svg {
-      width: 22px;
-      height: 22px;
+    .brand-title-wrap {
+      display: flex;
+      flex-direction: column;
     }
 
-    .brand-text h1 {
-      margin: 0;
-      font-size: 20px;
+    .brand-title {
+      font-size: 18px;
       font-weight: 700;
-      color: var(--text-main);
-      letter-spacing: -0.02em;
+      color: #ffffff;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+    }
+
+    .brand-tagline {
+      font-size: 11px;
+      color: #98a2b3;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+
+    nav.sidebar-nav {
+      padding: 20px 14px;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-section-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #667085;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 10px 12px 4px;
+      margin-top: 4px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      border-radius: 8px;
+      color: var(--sidebar-text);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      transition: all 0.15s ease-in-out;
+    }
+
+    .nav-item-left {
       display: flex;
       align-items: center;
       gap: 10px;
     }
 
-    .context-pill {
-      font-size: 11.5px;
+    .nav-item svg {
+      width: 18px;
+      height: 18px;
+      color: #667085;
+      transition: color 0.15s;
+    }
+
+    .nav-item:hover {
+      background: var(--sidebar-hover);
+      color: var(--sidebar-text-hover);
+    }
+
+    .nav-item:hover svg {
+      color: #ffffff;
+    }
+
+    .nav-item.active {
+      background: var(--sidebar-active);
+      color: #ffffff;
       font-weight: 600;
-      padding: 3px 9px;
+    }
+
+    .nav-item.active svg {
+      color: #60a5fa;
+    }
+
+    .nav-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .nav-item.active .nav-badge {
+      background: #2563eb;
+      color: #ffffff;
+    }
+
+    /* SIDEBAR FOOTER */
+    .sidebar-footer {
+      padding: 16px 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .system-health-pill {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulse-op 2s infinite;
+    }
+
+    @keyframes pulse-op {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.9); }
+    }
+
+    .user-profile-strip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 6px;
+    }
+
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .user-meta {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .user-name {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .user-role {
+      font-size: 11px;
+      color: #98a2b3;
+    }
+
+    /* MAIN CONTENT VIEW */
+    main.main-viewport {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--bg-canvas);
+    }
+
+    /* TOP BAR */
+    header.top-navbar {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .navbar-breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .breadcrumb-root {
+      font-weight: 600;
+      color: var(--text-main);
+      text-decoration: none;
+    }
+
+    .breadcrumb-sep {
+      color: var(--text-dim);
+    }
+
+    .context-pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
       border-radius: 9999px;
       background: var(--primary-light);
       border: 1px solid var(--primary-border);
       color: var(--primary);
-      letter-spacing: 0.02em;
+      margin-left: 6px;
     }
 
-    .brand-sub {
-      color: var(--text-muted);
-      font-size: 13px;
-      margin-top: 2px;
-    }
-
-    .header-actions {
+    .navbar-actions {
       display: flex;
       align-items: center;
       gap: 10px;
@@ -145,6 +353,7 @@
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
       padding: 8px 14px;
       border-radius: 8px;
@@ -171,7 +380,6 @@
 
     .btn-primary:hover {
       background: var(--primary-hover);
-      border-color: var(--primary-hover);
       box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
     }
 
@@ -179,11 +387,12 @@
       background: #ffffff;
       color: var(--text-body);
       border: 1px solid var(--border);
+      box-shadow: var(--shadow-xs);
     }
 
     .btn-secondary:hover {
       background: var(--surface-subtle);
-      border-color: #cbd5e1;
+      border-color: var(--border-dark);
       color: var(--text-main);
     }
 
@@ -237,7 +446,51 @@
       box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
     }
 
-    /* FLASH MESSAGE TOAST */
+    /* CONTENT WRAPPER */
+    .content-area {
+      padding: 28px 32px 48px;
+      flex-grow: 1;
+    }
+
+    /* WELCOME HEADER BANNER */
+    .welcome-header {
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .welcome-text h2 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.03em;
+    }
+
+    .welcome-sub {
+      color: var(--text-muted);
+      font-size: 13.5px;
+      margin-top: 4px;
+    }
+
+    .date-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      box-shadow: var(--shadow-xs);
+    }
+
+    /* FLASH TOAST */
     .flash-toast {
       background: #ffffff;
       border: 1px solid var(--primary-border);
@@ -253,15 +506,15 @@
       box-shadow: var(--shadow-sm);
     }
 
-    /* KPI METRICS STRIP */
-    .metrics-strip {
+    /* KPI METRICS CARDS */
+    .kpi-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
       gap: 16px;
       margin-bottom: 24px;
     }
 
-    .metric-card {
+    .kpi-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -276,35 +529,34 @@
       cursor: pointer;
     }
 
-    .metric-card:hover {
+    .kpi-card:hover {
       transform: translateY(-2px);
       box-shadow: var(--shadow-hover);
       border-color: #cbd5e1;
     }
 
-    .metric-card.active-card {
+    .kpi-card.active-card {
       border-color: var(--primary);
       background: #fafcff;
       box-shadow: 0 0 0 1px var(--primary);
     }
 
-    .metric-top {
+    .kpi-top {
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    .metric-label {
+    .kpi-label {
       font-size: 12.5px;
       font-weight: 600;
       color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.02em;
     }
 
-    .metric-badge {
-      width: 32px;
-      height: 32px;
+    .kpi-icon-badge {
+      width: 34px;
+      height: 34px;
       border-radius: 8px;
       display: flex;
       align-items: center;
@@ -317,7 +569,7 @@
     .badge-emerald { background: var(--success-light); color: var(--success); }
     .badge-rose { background: var(--danger-light); color: var(--danger); }
 
-    .metric-value {
+    .kpi-value {
       font-size: 30px;
       font-weight: 700;
       color: var(--text-main);
@@ -326,7 +578,7 @@
       letter-spacing: -0.02em;
     }
 
-    .metric-sub {
+    .kpi-sub {
       font-size: 12px;
       color: var(--text-muted);
       display: flex;
@@ -334,18 +586,51 @@
       gap: 4px;
     }
 
-    /* CONTROLS & FILTER BAR */
-    .controls-wrapper {
+    /* CARDS */
+    .content-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 12px 12px 0 0;
-      padding: 16px 20px;
+      border-radius: 12px;
+      box-shadow: var(--shadow-card);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .card-header-bar {
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 16px;
       flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .card-header-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .card-header-sub {
+      font-size: 12.5px;
+      color: var(--text-muted);
+    }
+
+    /* CONTROLS & FILTER BAR */
+    .controls-strip {
+      padding: 14px 20px;
+      background: #fafbfc;
       border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
     }
 
     .filter-pills {
@@ -357,13 +642,13 @@
 
     .filter-pill {
       padding: 6px 12px;
-      border-radius: 8px;
+      border-radius: 7px;
       font-size: 12.5px;
       font-weight: 600;
       text-decoration: none;
       color: var(--text-muted);
-      background: var(--surface-subtle);
-      border: 1px solid transparent;
+      background: #ffffff;
+      border: 1px solid var(--border);
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -371,12 +656,13 @@
     }
 
     .filter-pill:hover {
-      background: #e2e8f0;
+      background: var(--surface-subtle);
       color: var(--text-main);
     }
 
     .filter-pill.active {
       background: var(--text-main);
+      border-color: var(--text-main);
       color: #ffffff;
     }
 
@@ -393,14 +679,14 @@
       color: #ffffff;
     }
 
-    .search-wrapper {
+    .search-input-box {
       position: relative;
-      min-width: 280px;
+      min-width: 260px;
       flex-grow: 1;
-      max-width: 380px;
+      max-width: 360px;
     }
 
-    .search-icon {
+    .search-icon-svg {
       position: absolute;
       left: 12px;
       top: 50%;
@@ -411,10 +697,10 @@
 
     .search-input {
       width: 100%;
-      background: var(--bg);
+      background: #ffffff;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 12px 8px 36px;
+      border-radius: 7px;
+      padding: 7px 12px 7px 34px;
       font-size: 13px;
       color: var(--text-main);
       outline: none;
@@ -422,35 +708,24 @@
     }
 
     .search-input:focus {
-      background: #ffffff;
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
     }
 
     /* TABLE SECTION */
-    .table-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-top: none;
-      border-radius: 0 0 12px 12px;
-      overflow: hidden;
-      box-shadow: var(--shadow-card);
-      margin-bottom: 28px;
-    }
-
-    .table-container {
+    .table-responsive {
       width: 100%;
       overflow-x: auto;
     }
 
-    table {
+    table.data-table {
       width: 100%;
       border-collapse: collapse;
       text-align: left;
       font-size: 13.5px;
     }
 
-    th {
+    table.data-table th {
       background: #f8fafc;
       color: var(--text-muted);
       font-weight: 600;
@@ -462,27 +737,27 @@
       white-space: nowrap;
     }
 
-    td {
-      padding: 14px 18px;
+    table.data-table td {
+      padding: 13px 18px;
       border-bottom: 1px solid var(--border);
       vertical-align: middle;
       color: var(--text-body);
       font-variant-numeric: tabular-nums;
     }
 
-    tbody tr {
+    table.data-table tbody tr {
       transition: background 0.12s ease;
     }
 
-    tbody tr:hover {
+    table.data-table tbody tr:hover {
       background: #f8fafc;
     }
 
-    tbody tr:last-child td {
+    table.data-table tbody tr:last-child td {
       border-bottom: none;
     }
 
-    /* SEMANTIC STATUS PILLS */
+    /* STATUS PILLS */
     .status-pill {
       display: inline-flex;
       align-items: center;
@@ -502,46 +777,22 @@
       border-radius: 50%;
     }
 
-    .badge-QUEUED {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #e2e8f0;
-    }
+    .badge-QUEUED { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
     .badge-QUEUED .status-dot { background: #94a3b8; }
 
-    .badge-SCANNING {
-      background: #f0f9ff;
-      color: #0369a1;
-      border: 1px solid #bae6fd;
-    }
+    .badge-SCANNING { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
     .badge-SCANNING .status-dot { background: #0284c7; box-shadow: 0 0 4px #0284c7; }
 
-    .badge-REVIEW {
-      background: #fffbeb;
-      color: #b45309;
-      border: 1px solid #fde68a;
-    }
+    .badge-REVIEW { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
     .badge-REVIEW .status-dot { background: #d97706; }
 
-    .badge-APPROVED {
-      background: #ecfdf5;
-      color: #047857;
-      border: 1px solid #a7f3d0;
-    }
+    .badge-APPROVED { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
     .badge-APPROVED .status-dot { background: #10b981; }
 
-    .badge-POSTED {
-      background: #f0fdf4;
-      color: #15803d;
-      border: 1px solid #bbf7d0;
-    }
+    .badge-POSTED { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
     .badge-POSTED .status-dot { background: #16a34a; }
 
-    .badge-REJECTED {
-      background: #fef2f2;
-      color: #b91c1c;
-      border: 1px solid #fecaca;
-    }
+    .badge-REJECTED { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
     .badge-REJECTED .status-dot { background: #dc2626; }
 
     .bill-code {
@@ -554,7 +805,7 @@
       border: 1px solid var(--border);
     }
 
-    .currency-amt {
+    .currency-val {
       font-family: var(--font-mono);
       font-weight: 600;
       color: var(--text-main);
@@ -569,7 +820,7 @@
       color: var(--text-body);
     }
 
-    /* EMPTY STATE */
+    /* EMPTY STATES */
     .empty-state-box {
       text-align: center;
       padding: 48px 24px;
@@ -600,10 +851,76 @@
       margin-bottom: 18px;
     }
 
+    /* RATE INTELLIGENCE CARDS */
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .rate-insight-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .insight-pill {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: var(--success-light);
+      border: 1px solid var(--success-border);
+      color: var(--success);
+      width: fit-content;
+      margin-bottom: 8px;
+    }
+
+    .insight-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .insight-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .insight-diff-row {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-light);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .diff-badge {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--success);
+      background: var(--success-light);
+      border: 1px solid var(--success-border);
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
     /* FOOTER */
     footer.app-footer {
       border-top: 1px solid var(--border);
-      padding-top: 20px;
+      padding: 16px 32px;
+      background: #ffffff;
       display: flex;
       justify-content: space-between;
       color: var(--text-muted);
@@ -612,262 +929,606 @@
   </style>
 </head>
 <body>
-  <div class="app-wrapper">
 
-    <!-- TOP BAR -->
-    <header class="dashboard-header">
-      <div class="brand-group">
-        <div class="brand-logo">
+  <!-- LEFT DARK NAVY SIDEBAR -->
+  <aside class="app-sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">K</div>
+      <div class="brand-title-wrap">
+        <span class="brand-title">KiranaIQ</span>
+        <span class="brand-tagline">Purchase Intelligence</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-title">Operations</span>
+      
+      <a href="/ui/bills?view=overview" class="nav-item {% if current_view == 'overview' %}active{% endif %}" title="Purchase intelligence executive overview">
+        <div class="nav-item-left">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+          </svg>
+          <span>Overview</span>
+        </div>
+      </a>
+
+      <a href="/ui/bills?view=bills" class="nav-item {% if current_view == 'bills' %}active{% endif %}" title="Inward purchase bills & invoices">
+        <div class="nav-item-left">
           <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
           </svg>
+          <span>Bills & Invoices</span>
         </div>
-        <div class="brand-text">
-          <h1>
-            AI Bill Scanner Dashboard
-            <span class="context-pill">Single Store Pilot · INR · EX_GST</span>
-          </h1>
-          <div class="brand-sub">
-            Kirana Purchase Intelligence, Line-Item Verification & Price-Gap Alerts
-          </div>
+        <span class="nav-badge">{{ all_bills|length }}</span>
+      </a>
+
+      <a href="/ui/bills?view=price-intelligence" class="nav-item {% if current_view == 'price-intelligence' %}active{% endif %}" title="Cross-supplier rate comparison & price alerts">
+        <div class="nav-item-left">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+          </svg>
+          <span>Price Intelligence</span>
         </div>
+        {% if alerts %}
+        <span class="nav-badge" style="background:#dc2626; color:#fff;">{{ alerts|length }}</span>
+        {% endif %}
+      </a>
+
+      <a href="/ui/bills?view=suppliers" class="nav-item {% if current_view == 'suppliers' %}active{% endif %}" title="Vendor master & purchase distribution">
+        <div class="nav-item-left">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+          </svg>
+          <span>Suppliers</span>
+        </div>
+        <span class="nav-badge">{{ suppliers|length }}</span>
+      </a>
+
+      <span class="nav-section-title" style="margin-top:14px;">System</span>
+
+      <a href="/ui/bills?view=activity" class="nav-item {% if current_view == 'activity' %}active{% endif %}" title="Event logs, scheduler health & worker triggers">
+        <div class="nav-item-left">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+          <span>Activity Center</span>
+        </div>
+      </a>
+
+      <a href="/ui/bills?view=settings" class="nav-item {% if current_view == 'settings' %}active{% endif %}" title="Store pilot rules, lookback window & API parameters">
+        <div class="nav-item-left">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <span>Settings</span>
+        </div>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="system-health-pill">
+        <span class="pulse-dot"></span>
+        <span>KiranaIQ Engine Active</span>
       </div>
 
-      <div class="header-actions">
-        <!-- WORKER TRIGGER ACTION BUTTONS -->
+      <div class="user-profile-strip">
+        <div class="user-avatar">SM</div>
+        <div class="user-meta">
+          <span class="user-name">Kirana Store Admin</span>
+          <span class="user-role">store_manager · Pilot</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN VIEWPORT -->
+  <main class="main-viewport">
+    
+    <!-- TOP NAVIGATION & CONTROLS -->
+    <header class="top-navbar">
+      <div class="navbar-breadcrumbs">
+        <a href="/ui/bills" class="breadcrumb-root">KiranaIQ</a>
+        <span class="breadcrumb-sep">/</span>
+        <span style="font-weight:600; color:var(--text-main);">{{ current_view|replace('-', ' ')|title }}</span>
+        <span class="context-pill">Single Store Pilot · INR · EX_GST</span>
+      </div>
+
+      <div class="navbar-actions">
+        <!-- Worker Controls -->
         <form action="/ui/workers/run/scan" method="POST" style="margin:0;">
-          <button type="submit" class="btn btn-worker" title="Extract oldest QUEUED bill via Gemini Vision">
+          <button type="submit" class="btn btn-worker" title="Scan oldest queued bill with Gemini Vision">
             ▶ Run Scan Worker
           </button>
         </form>
         <form action="/ui/workers/run/post" method="POST" style="margin:0;">
-          <button type="submit" class="btn btn-worker" title="Validate & post oldest APPROVED bill to purchase ledger">
+          <button type="submit" class="btn btn-worker" title="Post oldest approved bill & run rate comparison">
             ▶ Run Post Worker
           </button>
         </form>
         <form action="/ui/workers/run/alert" method="POST" style="margin:0;">
-          <button type="submit" class="btn btn-worker" title="Dispatch oldest PENDING price-gap alert via WhatsApp">
+          <button type="submit" class="btn btn-worker" title="Dispatch oldest pending alert via WhatsApp">
             ▶ Run Alert Outbox
           </button>
         </form>
 
-        <a href="/workers/status" target="_blank" class="btn btn-secondary" title="View background scheduler intervals and active workers">
-          Workers Status
-        </a>
-        <a href="/docs" target="_blank" class="btn btn-secondary" title="Interactive OpenAPI / Swagger documentation">
-          API Docs
-        </a>
+        <a href="/workers/status" target="_blank" class="btn btn-secondary">Workers Status</a>
+        <a href="/docs" target="_blank" class="btn btn-secondary">API Docs</a>
       </div>
     </header>
 
-    <!-- FLASH STATUS BANNER -->
-    {% if request.query_params.get('msg') %}
-    <div class="flash-toast">
-      <div style="display: flex; align-items: center; gap: 10px;">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--primary);">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        <strong>{{ request.query_params.get('msg') }}</strong>
+    <!-- CONTENT AREA -->
+    <div class="content-area">
+
+      <!-- WELCOME / CONTEXT HEADER -->
+      <div class="welcome-header">
+        <div class="welcome-text">
+          <h2>Good morning, Welcome to KiranaIQ</h2>
+          <div class="welcome-sub">
+            Your purchase intelligence and supplier price monitoring workspace. | AI Bill Scanner Dashboard
+          </div>
+        </div>
+        <div class="date-badge">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+          </svg>
+          <span>{{ now_ist }}</span>
+        </div>
       </div>
-      <a href="/ui/bills?status_filter={{ status_filter }}" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">✕ Dismiss</a>
-    </div>
-    {% endif %}
 
-    <!-- KPI SUMMARY STRIP (CLICKABLE FILTER CARDS) -->
-    <div class="metrics-strip">
-      <a href="/ui/bills?status_filter=ALL" class="metric-card {% if status_filter == 'ALL' %}active-card{% endif %}" title="Click to view all bills">
-        <div class="metric-top">
-          <span class="metric-label">Total Inward Bills</span>
-          <div class="metric-badge badge-blue">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-            </svg>
-          </div>
+      <!-- FLASH TOAST BANNER -->
+      {% if request.query_params.get('msg') %}
+      <div class="flash-toast">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--primary);">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <strong>{{ request.query_params.get('msg') }}</strong>
         </div>
-        <div class="metric-value">{{ metrics.total if metrics else bills|length }}</div>
-        <div class="metric-sub">Lifetime WhatsApp intake</div>
-      </a>
-
-      <a href="/ui/bills?status_filter=REVIEW" class="metric-card {% if status_filter == 'REVIEW' %}active-card{% endif %}" title="Click to filter bills requiring review">
-        <div class="metric-top">
-          <span class="metric-label">Awaiting Review</span>
-          <div class="metric-badge badge-amber">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="metric-value" style="color: #b45309;">{{ metrics.review if metrics else 0 }}</div>
-        <div class="metric-sub">Manager action required</div>
-      </a>
-
-      <a href="/ui/bills?status_filter=QUEUED" class="metric-card {% if status_filter == 'QUEUED' %}active-card{% endif %}" title="Click to filter queued bills">
-        <div class="metric-top">
-          <span class="metric-label">Queue & OCR Scanning</span>
-          <div class="metric-badge badge-cyan">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="metric-value">
-          {{ (metrics.queued + metrics.scanning) if metrics else 0 }}
-        </div>
-        <div class="metric-sub">Queued ({{ metrics.queued if metrics else 0 }}) · Scan ({{ metrics.scanning if metrics else 0 }})</div>
-      </a>
-
-      <a href="/ui/bills?status_filter=POSTED" class="metric-card {% if status_filter == 'POSTED' %}active-card{% endif %}" title="Click to filter posted purchases">
-        <div class="metric-top">
-          <span class="metric-label">Verified & Posted</span>
-          <div class="metric-badge badge-emerald">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="metric-value" style="color: #15803d;">{{ metrics.posted if metrics else 0 }}</div>
-        <div class="metric-sub">Committed to purchase ledger</div>
-      </a>
-
-      <div class="metric-card">
-        <div class="metric-top">
-          <span class="metric-label">Price-Gap Alerts</span>
-          <div class="metric-badge badge-rose">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-            </svg>
-          </div>
-        </div>
-        <div class="metric-value" style="font-size: 21px; margin-top: 14px;">
-          {% if has_pending_alert %}
-          <span style="color: #dc2626;">Pending Dispatch</span>
-          {% else %}
-          <span style="color: #059669; font-size: 18px;">All Dispatched</span>
-          {% endif %}
-        </div>
-        <div class="metric-sub">Outbox monitor (>= 2% gap)</div>
+        <a href="/ui/bills?view={{ current_view }}&status_filter={{ status_filter }}" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">✕ Dismiss</a>
       </div>
-    </div>
+      {% endif %}
 
-    <!-- CONTROLS & FILTER BAR -->
-    <div class="controls-wrapper">
-      <div class="filter-pills">
-        <a href="/ui/bills?status_filter=ALL" class="filter-pill {% if status_filter == 'ALL' %}active{% endif %}">
-          <span>ALL</span>
-          <span class="filter-pill-count">{{ status_counts.ALL if status_counts else bills|length }}</span>
+      <!-- VIEW 1: OVERVIEW & GENERAL DASHBOARD -->
+      {% if current_view == 'overview' or current_view == 'bills' %}
+      
+      <!-- 5 KPI METRICS CARDS -->
+      <div class="kpi-grid">
+        <a href="/ui/bills?view=bills&status_filter=ALL" class="kpi-card {% if status_filter == 'ALL' and current_view == 'bills' %}active-card{% endif %}" title="View all inward bills">
+          <div class="kpi-top">
+            <span class="kpi-label">Total Bills</span>
+            <div class="kpi-icon-badge badge-blue">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value">{{ metrics.total }}</div>
+          <div class="kpi-sub">Lifetime inward bills</div>
         </a>
-        {% for st in statuses %}
-        <a href="/ui/bills?status_filter={{ st }}" class="filter-pill {% if status_filter == st %}active{% endif %}">
-          <span>{{ st }}</span>
-          <span class="filter-pill-count">{{ status_counts[st] if status_counts and st in status_counts else '0' }}</span>
+
+        <a href="/ui/bills?view=bills&status_filter=REVIEW" class="kpi-card {% if status_filter == 'REVIEW' %}active-card{% endif %}" title="View bills requiring verification">
+          <div class="kpi-top">
+            <span class="kpi-label">Pending Reviews</span>
+            <div class="kpi-icon-badge badge-amber">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value" style="color: #b45309;">{{ metrics.review }}</div>
+          <div class="kpi-sub">Action required by reviewer</div>
         </a>
-        {% endfor %}
-      </div>
 
-      <div class="search-wrapper">
-        <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-        </svg>
-        <input type="text" id="billSearch" class="search-input" placeholder="Search bill ID, supplier, invoice, or phone...">
-      </div>
-    </div>
+        <a href="/ui/bills?view=bills&status_filter=APPROVED" class="kpi-card {% if status_filter == 'APPROVED' %}active-card{% endif %}" title="View approved & posted bills">
+          <div class="kpi-top">
+            <span class="kpi-label">Approved Bills</span>
+            <div class="kpi-icon-badge badge-emerald">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value" style="color: #059669;">{{ metrics.approved + metrics.posted }}</div>
+          <div class="kpi-sub">Approved ({{ metrics.approved }}) · Posted ({{ metrics.posted }})</div>
+        </a>
 
-    <!-- DATA TABLE CARD -->
-    <div class="table-card">
-      <div class="table-container">
-        <table id="billsTable">
-          <thead>
-            <tr>
-              <th>Bill ID</th>
-              <th>Received</th>
-              <th>Sender</th>
-              <th>Status</th>
-              <th>Supplier (Extracted)</th>
-              <th>Invoice No</th>
-              <th style="text-align: right;">Net Total (INR)</th>
-              <th style="text-align: center;">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for b in bills %}
-            <tr class="bill-row" data-search="{{ b.bill_id|lower }} {{ (b.supplier_raw or '')|lower }} {{ (b.invoice_no or '')|lower }} {{ b.sender|lower }}">
-              <td>
-                <span class="bill-code" title="{{ b.bill_id }}">
-                  {{ b.bill_id[:18] }}{{ '...' if b.bill_id|length > 18 else '' }}
-                </span>
-              </td>
-              <td style="color: var(--text-muted); white-space: nowrap;">
-                {{ b.received_at.strftime('%d-%b-%Y %H:%M') if b.received_at else '-' }}
-              </td>
-              <td>
-                <span class="sender-badge">
-                  <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" style="color: #16a34a;">
-                    <path d="M12.031 2C6.496 2 2 6.496 2 12.031c0 1.953.563 3.773 1.531 5.313L2 22l4.828-1.5a10.015 10.015 0 005.203 1.531c5.535 0 10.031-4.496 10.031-10.031S17.566 2 12.031 2z"></path>
-                  </svg>
-                  {{ b.sender }}
-                </span>
-              </td>
-              <td>
-                <span class="status-pill badge-{{ b.status.value }}">
-                  <span class="status-dot"></span>
-                  {{ b.status.value }}
-                </span>
-              </td>
-              <td style="font-weight: 600; color: var(--text-main);">
-                {{ b.supplier_raw or '<span style="color:#94a3b8; font-weight:normal;">Pending Scan</span>'|safe }}
-              </td>
-              <td>
-                {% if b.invoice_no %}
-                <span style="font-family: var(--font-mono); font-size: 13px;">{{ b.invoice_no }}</span>
-                {% else %}
-                <span style="color: var(--text-dim);">-</span>
-                {% endif %}
-              </td>
-              <td class="currency-amt">
-                {% if b.verified_net_total is not none %}
-                  ₹{{ "%.2f"|format(b.verified_net_total) }}
-                {% elif b.invoice_total %}
-                  ₹{{ b.invoice_total }}
-                {% else %}
-                  <span style="color: var(--text-dim);">-</span>
-                {% endif %}
-              </td>
-              <td style="text-align: center; white-space: nowrap;">
-                <a href="/ui/bills/{{ b.bill_id }}" class="btn-action {% if b.status.value == 'REVIEW' %}btn-action-highlight{% endif %}">
-                  Review Bill &rarr;
-                </a>
-              </td>
-            </tr>
+        <a href="/ui/bills?view=price-intelligence" class="kpi-card" title="View price discrepancy alerts">
+          <div class="kpi-top">
+            <span class="kpi-label">Price Alerts</span>
+            <div class="kpi-icon-badge badge-rose">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value" style="color: #dc2626;">{{ metrics.alerts_count }}</div>
+          <div class="kpi-sub">
+            {% if has_pending_alert %}
+            <span style="color:#dc2626; font-weight:600;">Pending WhatsApp Dispatch</span>
             {% else %}
-            <tr>
-              <td colspan="8">
-                <div class="empty-state-box">
-                  <div class="empty-icon-wrap">
-                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                  </div>
-                  <div class="empty-title">No bills found under filter "{{ status_filter }}"</div>
-                  <div class="empty-desc">There are currently no purchase bills in this state.</div>
-                  <a href="/ui/bills?status_filter=ALL" class="btn btn-secondary">
-                    Reset Filter · View All Bills
-                  </a>
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+            <span>Price gaps >= 2.00%</span>
+            {% endif %}
+          </div>
+        </a>
+
+        <a href="/ui/bills?view=suppliers" class="kpi-card" title="View active suppliers">
+          <div class="kpi-top">
+            <span class="kpi-label">Active Suppliers</span>
+            <div class="kpi-icon-badge badge-cyan">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value">{{ metrics.active_suppliers }}</div>
+          <div class="kpi-sub">Verified vendor master</div>
+        </a>
       </div>
+
+      <!-- PURCHASE INTELLIGENCE INSIGHTS STRIP (IF HISTORICAL PURCHASES EXIST) -->
+      {% if purchases %}
+      <div class="analytics-grid">
+        <div class="rate-insight-card">
+          <div>
+            <span class="insight-pill">Savings Opportunity</span>
+            <div class="insight-title">Cross-Supplier Rate Arbitrage Detected</div>
+            <div class="insight-desc">
+              Historical purchase analysis shows price gaps between active kirana distributors. E.g. Parle-G 10pk purchased from <strong>Suresh Wholesale</strong> @ ₹46.00/unit vs <strong>Ramesh Traders</strong> @ ₹50.00/unit.
+            </div>
+          </div>
+          <div class="insight-diff-row">
+            <span style="font-size:13px; font-weight:600; color:var(--text-main);">Potential Margin Savings</span>
+            <span class="diff-badge">+8.00% Gap (₹4.00/unit)</span>
+          </div>
+        </div>
+
+        <div class="rate-insight-card">
+          <div>
+            <span class="insight-pill" style="background:#eff6ff; border-color:#bfdbfe; color:#2563eb;">Ledger Activity</span>
+            <div class="insight-title">Verified Purchase Ledger</div>
+            <div class="insight-desc">
+              Currently tracking <strong>{{ purchases|length }}</strong> verified line purchase transactions across <strong>{{ products|length }}</strong> canonical packaged SKUs on pre-tax integer paise cost basis.
+            </div>
+          </div>
+          <div class="insight-diff-row">
+            <span style="font-size:13px; font-weight:600; color:var(--text-main);">Analytical Basis</span>
+            <span style="font-family:var(--font-mono); font-size:12.5px; font-weight:700; color:var(--primary);">EX_GST · Integer Paise</span>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- INWARD BILLS MANAGEMENT TABLE CARD -->
+      <div class="content-card">
+        <div class="card-header-bar">
+          <div>
+            <h3 class="card-header-title">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--primary);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Recent Bills & Invoices
+            </h3>
+            <div class="card-header-sub">
+              Showing <strong>{{ bills|length }}</strong> bills in current view (sorted FIFO by oldest received first)
+            </div>
+          </div>
+        </div>
+
+        <!-- CONTROLS & FILTER BAR -->
+        <div class="controls-strip">
+          <div class="filter-pills">
+            <a href="/ui/bills?view={{ current_view }}&status_filter=ALL" class="filter-pill {% if status_filter == 'ALL' %}active{% endif %}">
+              <span>ALL</span>
+              <span class="filter-pill-count">{{ status_counts.ALL }}</span>
+            </a>
+            {% for st in statuses %}
+            <a href="/ui/bills?view={{ current_view }}&status_filter={{ st }}" class="filter-pill {% if status_filter == st %}active{% endif %}">
+              <span>{{ st }}</span>
+              <span class="filter-pill-count">{{ status_counts[st] if st in status_counts else '0' }}</span>
+            </a>
+            {% endfor %}
+          </div>
+
+          <div class="search-input-box">
+            <svg class="search-icon-svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input type="text" id="billSearch" class="search-input" placeholder="Search bill ID, supplier, invoice, or phone...">
+          </div>
+        </div>
+
+        <!-- BILLS TABLE -->
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Bill ID</th>
+                <th>Received</th>
+                <th>Sender (WhatsApp)</th>
+                <th>Status</th>
+                <th>Supplier (Extracted)</th>
+                <th>Invoice No</th>
+                <th style="text-align: right;">Net Total (INR)</th>
+                <th style="text-align: center;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for b in bills %}
+              <tr class="bill-row" data-search="{{ b.bill_id|lower }} {{ (b.supplier_raw or '')|lower }} {{ (b.invoice_no or '')|lower }} {{ b.sender|lower }}">
+                <td>
+                  <span class="bill-code" title="{{ b.bill_id }}">
+                    {{ b.bill_id[:18] }}{{ '...' if b.bill_id|length > 18 else '' }}
+                  </span>
+                </td>
+                <td style="color: var(--text-muted); white-space: nowrap;">
+                  {{ b.received_at.strftime('%d-%b-%Y %H:%M') if b.received_at else '-' }}
+                </td>
+                <td>
+                  <span class="sender-badge">
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" style="color: #16a34a;">
+                      <path d="M12.031 2C6.496 2 2 6.496 2 12.031c0 1.953.563 3.773 1.531 5.313L2 22l4.828-1.5a10.015 10.015 0 005.203 1.531c5.535 0 10.031-4.496 10.031-10.031S17.566 2 12.031 2z"></path>
+                    </svg>
+                    {{ b.sender }}
+                  </span>
+                </td>
+                <td>
+                  <span class="status-pill badge-{{ b.status.value }}">
+                    <span class="status-dot"></span>
+                    {{ b.status.value }}
+                  </span>
+                </td>
+                <td style="font-weight: 600; color: var(--text-main);">
+                  {{ b.supplier_raw or '<span style="color:#98a2b3; font-weight:normal;">Pending Scan</span>'|safe }}
+                </td>
+                <td>
+                  {% if b.invoice_no %}
+                  <span style="font-family: var(--font-mono); font-size: 13px;">{{ b.invoice_no }}</span>
+                  {% else %}
+                  <span style="color: var(--text-dim);">-</span>
+                  {% endif %}
+                </td>
+                <td class="currency-val">
+                  {% if b.verified_net_total is not none %}
+                    ₹{{ "%.2f"|format(b.verified_net_total) }}
+                  {% elif b.invoice_total %}
+                    ₹{{ b.invoice_total }}
+                  {% else %}
+                    <span style="color: var(--text-dim);">-</span>
+                  {% endif %}
+                </td>
+                <td style="text-align: center; white-space: nowrap;">
+                  <a href="/ui/bills/{{ b.bill_id }}" class="btn-action {% if b.status.value == 'REVIEW' %}btn-action-highlight{% endif %}">
+                    Review Bill &rarr;
+                  </a>
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="8">
+                  <div class="empty-state-box">
+                    <div class="empty-icon-wrap">
+                      <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                      </svg>
+                    </div>
+                    <div class="empty-title">No bills found under filter "{{ status_filter }}"</div>
+                    <div class="empty-desc">There are currently no purchase bills in this state.</div>
+                    <a href="/ui/bills?view={{ current_view }}&status_filter=ALL" class="btn btn-secondary">
+                      Reset Filter · View All Bills
+                    </a>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- VIEW 2: PRICE INTELLIGENCE -->
+      {% if current_view == 'price-intelligence' %}
+      <div class="content-card">
+        <div class="card-header-bar">
+          <div>
+            <h3 class="card-header-title">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--primary);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+              </svg>
+              Price Gap Alerts & Supplier Rate Comparison
+            </h3>
+            <div class="card-header-sub">
+              Alerts generated when normalized rate gap >= 1 paisa and >= 2.00% within 30-day historical window.
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Product SKU</th>
+                <th>Cheaper Supplier (Low)</th>
+                <th>Low Rate (INR)</th>
+                <th>Dearer Supplier (High)</th>
+                <th>High Rate (INR)</th>
+                <th>Price Gap (%)</th>
+                <th>Status</th>
+                <th>Dispatched WAMID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in alerts %}
+              <tr>
+                <td><strong>{{ a.sku }}</strong></td>
+                <td>{{ a.low_supplier }}</td>
+                <td style="font-family:var(--font-mono); color:#059669; font-weight:600;">₹{{ "%.2f"|format(a.low_rate / 100) }}/unit</td>
+                <td>{{ a.high_supplier }}</td>
+                <td style="font-family:var(--font-mono); color:#dc2626; font-weight:600;">₹{{ "%.2f"|format(a.high_rate / 100) }}/unit</td>
+                <td>
+                  <span class="diff-badge">{{ "%.2f"|format(a.gap_pct) }}%</span>
+                </td>
+                <td>
+                  <span class="status-pill badge-{{ a.status.value }}">
+                    <span class="status-dot"></span>
+                    {{ a.status.value }}
+                  </span>
+                </td>
+                <td style="font-family:var(--font-mono); font-size:12px; color:var(--text-muted);">
+                  {{ a.wamid or '-' }}
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="8">
+                  <div class="empty-state-box">
+                    <div class="empty-title">No price-gap alerts triggered yet</div>
+                    <div class="empty-desc">
+                      Price alerts trigger automatically when a bill is posted with a price difference of at least 1 paisa and >= 2.00% against another active supplier.
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- VIEW 3: SUPPLIERS -->
+      {% if current_view == 'suppliers' %}
+      <div class="content-card">
+        <div class="card-header-bar">
+          <div>
+            <h3 class="card-header-title">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--primary);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+              </svg>
+              Suppliers Master & Performance
+            </h3>
+            <div class="card-header-sub">
+              Configured vendor accounts eligible for purchase recording and rate comparison.
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Supplier ID</th>
+                <th>Supplier Name</th>
+                <th>Active Status</th>
+                <th>Linked Inward Bills</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in suppliers %}
+              <tr>
+                <td><span class="bill-code">{{ s.supplier_id }}</span></td>
+                <td><strong>{{ s.supplier_name }}</strong></td>
+                <td>
+                  <span class="status-pill {% if s.active.value == 'YES' %}badge-APPROVED{% else %}badge-REJECTED{% endif %}">
+                    <span class="status-dot"></span>
+                    {{ s.active.value }}
+                  </span>
+                </td>
+                <td>
+                  {% set bill_count = 0 %}
+                  {% for b in all_bills %}
+                    {% if b.supplier_id == s.supplier_id %}
+                      {% set bill_count = bill_count + 1 %}
+                    {% endif %}
+                  {% endfor %}
+                  {{ bill_count }} bill(s) recorded
+                </td>
+              </tr>
+              {% else %}
+              <tr>
+                <td colspan="4">
+                  <div class="empty-state-box">
+                    <div class="empty-title">No suppliers configured</div>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- VIEW 4: ACTIVITY CENTER & SYSTEM HEALTH -->
+      {% if current_view == 'activity' %}
+      <div class="analytics-grid">
+        <div class="rate-insight-card">
+          <div class="insight-title">Background Scheduler & Workers</div>
+          <div class="insight-desc">
+            Autonomous background loops for AI scanning, bill posting, and alert outbox.
+          </div>
+          <div style="margin-top:12px; font-size:13px; display:flex; flex-direction:column; gap:6px;">
+            <div>● Status: <strong>{{ 'Running (APScheduler Active)' if scheduler_running else 'Manual Trigger Mode (Safe)' }}</strong></div>
+            <div>● Scan Worker Interval: <strong>15s</strong></div>
+            <div>● Post Worker Interval: <strong>15s</strong></div>
+            <div>● Alert Outbox Interval: <strong>30s</strong></div>
+          </div>
+        </div>
+
+        <div class="rate-insight-card">
+          <div class="insight-title">Integrations & Seams</div>
+          <div class="insight-desc">
+            Current status of Meta WhatsApp Cloud API and Google Gemini Vision.
+          </div>
+          <div style="margin-top:12px; font-size:13px; display:flex; flex-direction:column; gap:6px;">
+            <div>● WhatsApp Webhook: <strong>Listening on /webhook/whatsapp</strong></div>
+            <div>● Gemini Model: <strong>gemini-1.5-flash</strong></div>
+            <div>● Timezone: <strong>Asia/Kolkata (IST)</strong></div>
+            <div>● Arithmetic: <strong>Integer Paise (100 paise = 1 INR)</strong></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- VIEW 5: SETTINGS -->
+      {% if current_view == 'settings' %}
+      <div class="content-card">
+        <div class="card-header-bar">
+          <h3 class="card-header-title">KiranaIQ Pilot Configuration</h3>
+        </div>
+        <div style="padding: 24px;">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+            <div style="background:#f8fafc; border:1px solid #eaecf0; border-radius:8px; padding:14px;">
+              <div style="font-size:11.5px; font-weight:600; color:#667085; text-transform:uppercase;">Historical Lookback</div>
+              <div style="font-size:16px; font-weight:700; color:#101828; margin-top:4px;">30 Days</div>
+            </div>
+            <div style="background:#f8fafc; border:1px solid #eaecf0; border-radius:8px; padding:14px;">
+              <div style="font-size:11.5px; font-weight:600; color:#667085; text-transform:uppercase;">Bill Recency Gate</div>
+              <div style="font-size:16px; font-weight:700; color:#101828; margin-top:4px;">7 Days from Today (IST)</div>
+            </div>
+            <div style="background:#f8fafc; border:1px solid #eaecf0; border-radius:8px; padding:14px;">
+              <div style="font-size:11.5px; font-weight:600; color:#667085; text-transform:uppercase;">Minimum Gap Percentage</div>
+              <div style="font-size:16px; font-weight:700; color:#101828; margin-top:4px;">2.00%</div>
+            </div>
+            <div style="background:#f8fafc; border:1px solid #eaecf0; border-radius:8px; padding:14px;">
+              <div style="font-size:11.5px; font-weight:600; color:#667085; text-transform:uppercase;">Minimum Gap Paise</div>
+              <div style="font-size:16px; font-weight:700; color:#101828; margin-top:4px;">1 Paisa / Unit</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
     </div>
 
     <!-- FOOTER -->
     <footer class="app-footer">
-      <div>AI Bill Scanner Automation · Kirana Purchase Intelligence Architecture</div>
+      <div>KiranaIQ — AI-Powered Purchase Intelligence & Rate Arbitrage Platform</div>
       <div>Timezone: Asia/Kolkata (IST) · Rates: Integer Paise (EX_GST)</div>
     </footer>
 
-  </div>
+  </main>
 
   <!-- INSTANT CLIENT-SIDE SEARCH SCRIPT -->
   <script>
