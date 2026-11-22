@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Bill Scanner Dashboard</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --card-hover: #fcfdfe;
+      --surface-subtle: #f1f5f9;
+      --surface-muted: #f8fafc;
+      
+      --text-main: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      
+      --border: #e2e8f0;
+      --border-subtle: #edf2f7;
+      --border-focus: #3b82f6;
+
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-light: #eff6ff;
+      --primary-border: #bfdbfe;
+
+      --success: #059669;
+      --success-light: #ecfdf5;
+      --success-border: #a7f3d0;
+
+      --warning: #d97706;
+      --warning-light: #fffbeb;
+      --warning-border: #fde68a;
+
+      --danger: #dc2626;
+      --danger-light: #fef2f2;
+      --danger-border: #fecaca;
+
+      --info: #0284c7;
+      --info-light: #f0f9ff;
+      --info-border: #bae6fd;
+
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+      --shadow-hover: 0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+      
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text-body);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app-wrapper {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 28px 32px 48px;
+    }
+
+    /* TOP BRAND & NAVIGATION BAR */
+    header.dashboard-header {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+    }
+
+    .brand-logo svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .brand-text h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .context-pill {
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 9999px;
+      background: var(--primary-light);
+      border: 1px solid var(--primary-border);
+      color: var(--primary);
+      letter-spacing: 0.02em;
+    }
+
+    .brand-sub {
+      color: var(--text-muted);
+      font-size: 13px;
+      margin-top: 2px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+      line-height: 1.25;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      border-color: var(--primary-hover);
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-secondary {
+      background: #ffffff;
+      color: var(--text-body);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--surface-subtle);
+      border-color: #cbd5e1;
+      color: var(--text-main);
+    }
+
+    .btn-worker {
+      background: #ffffff;
+      color: var(--text-body);
+      border: 1px solid var(--border);
+      font-size: 12.5px;
+      padding: 7px 12px;
+      font-weight: 600;
+    }
+
+    .btn-worker:hover {
+      background: var(--primary-light);
+      border-color: var(--primary-border);
+      color: var(--primary);
+    }
+
+    .btn-action {
+      background: var(--primary-light);
+      color: var(--primary);
+      border: 1px solid var(--primary-border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+
+    .btn-action:hover {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-action-highlight {
+      background: var(--warning-light);
+      color: #b45309;
+      border-color: var(--warning-border);
+    }
+
+    .btn-action-highlight:hover {
+      background: var(--warning);
+      color: #ffffff;
+      border-color: var(--warning);
+      box-shadow: 0 2px 6px rgba(217, 119, 6, 0.25);
+    }
+
+    /* FLASH MESSAGE TOAST */
+    .flash-toast {
+      background: #ffffff;
+      border: 1px solid var(--primary-border);
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 12px 18px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-main);
+      font-size: 13.5px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* KPI METRICS STRIP */
+    .metrics-strip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: var(--shadow-card);
+      transition: all 0.15s ease-in-out;
+      cursor: pointer;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-hover);
+      border-color: #cbd5e1;
+    }
+
+    .metric-card.active-card {
+      border-color: var(--primary);
+      background: #fafcff;
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    .metric-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .metric-label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .metric-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .badge-blue { background: var(--primary-light); color: var(--primary); }
+    .badge-amber { background: var(--warning-light); color: var(--warning); }
+    .badge-cyan { background: var(--info-light); color: var(--info); }
+    .badge-emerald { background: var(--success-light); color: var(--success); }
+    .badge-rose { background: var(--danger-light); color: var(--danger); }
+
+    .metric-value {
+      font-size: 30px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin: 10px 0 2px 0;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+
+    .metric-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* CONTROLS & FILTER BAR */
+    .controls-wrapper {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px 12px 0 0;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .filter-pill {
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-decoration: none;
+      color: var(--text-muted);
+      background: var(--surface-subtle);
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .filter-pill:hover {
+      background: #e2e8f0;
+      color: var(--text-main);
+    }
+
+    .filter-pill.active {
+      background: var(--text-main);
+      color: #ffffff;
+    }
+
+    .filter-pill-count {
+      font-size: 11px;
+      padding: 1px 6px;
+      border-radius: 9999px;
+      background: rgba(0, 0, 0, 0.08);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .filter-pill.active .filter-pill-count {
+      background: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+    }
+
+    .search-wrapper {
+      position: relative;
+      min-width: 280px;
+      flex-grow: 1;
+      max-width: 380px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px 8px 36px;
+      font-size: 13px;
+      color: var(--text-main);
+      outline: none;
+      transition: all 0.15s;
+    }
+
+    .search-input:focus {
+      background: #ffffff;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    /* TABLE SECTION */
+    .table-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+      margin-bottom: 28px;
+    }
+
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13.5px;
+    }
+
+    th {
+      background: #f8fafc;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--text-body);
+      font-variant-numeric: tabular-nums;
+    }
+
+    tbody tr {
+      transition: background 0.12s ease;
+    }
+
+    tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* SEMANTIC STATUS PILLS */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 9px;
+      border-radius: 9999px;
+      font-size: 11.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .badge-QUEUED {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+    }
+    .badge-QUEUED .status-dot { background: #94a3b8; }
+
+    .badge-SCANNING {
+      background: #f0f9ff;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+    }
+    .badge-SCANNING .status-dot { background: #0284c7; box-shadow: 0 0 4px #0284c7; }
+
+    .badge-REVIEW {
+      background: #fffbeb;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+    .badge-REVIEW .status-dot { background: #d97706; }
+
+    .badge-APPROVED {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+    .badge-APPROVED .status-dot { background: #10b981; }
+
+    .badge-POSTED {
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+    .badge-POSTED .status-dot { background: #16a34a; }
+
+    .badge-REJECTED {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+    .badge-REJECTED .status-dot { background: #dc2626; }
+
+    .bill-code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-main);
+      background: var(--surface-subtle);
+      padding: 3px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .currency-amt {
+      font-family: var(--font-mono);
+      font-weight: 600;
+      color: var(--text-main);
+      text-align: right;
+    }
+
+    .sender-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      color: var(--text-body);
+    }
+
+    /* EMPTY STATE */
+    .empty-state-box {
+      text-align: center;
+      padding: 48px 24px;
+    }
+
+    .empty-icon-wrap {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: var(--surface-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      color: var(--text-dim);
+    }
+
+    .empty-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+
+    .empty-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+    }
+
+    /* FOOTER */
+    footer.app-footer {
+      border-top: 1px solid var(--border);
+      padding-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      font-size: 12.5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-wrapper">
+
+    <!-- TOP BAR -->
+    <header class="dashboard-header">
+      <div class="brand-group">
+        <div class="brand-logo">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>
+            AI Bill Scanner Dashboard
+            <span class="context-pill">Single Store Pilot · INR · EX_GST</span>
+          </h1>
+          <div class="brand-sub">
+            Kirana Purchase Intelligence, Line-Item Verification & Price-Gap Alerts
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- WORKER TRIGGER ACTION BUTTONS -->
+        <form action="/ui/workers/run/scan" method="POST" style="margin:0;">
+          <button type="submit" class="btn btn-worker" title="Extract oldest QUEUED bill via Gemini Vision">
+            ▶ Run Scan Worker
+          </button>
+        </form>
+        <form action="/ui/workers/run/post" method="POST" style="margin:0;">
+          <button type="submit" class="btn btn-worker" title="Validate & post oldest APPROVED bill to purchase ledger">
+            ▶ Run Post Worker
+          </button>
+        </form>
+        <form action="/ui/workers/run/alert" method="POST" style="margin:0;">
+          <button type="submit" class="btn btn-worker" title="Dispatch oldest PENDING price-gap alert via WhatsApp">
+            ▶ Run Alert Outbox
+          </button>
+        </form>
+
+        <a href="/workers/status" target="_blank" class="btn btn-secondary" title="View background scheduler intervals and active workers">
+          Workers Status
+        </a>
+        <a href="/docs" target="_blank" class="btn btn-secondary" title="Interactive OpenAPI / Swagger documentation">
+          API Docs
+        </a>
+      </div>
+    </header>
+
+    <!-- FLASH STATUS BANNER -->
+    {% if request.query_params.get('msg') %}
+    <div class="flash-toast">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--primary);">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <strong>{{ request.query_params.get('msg') }}</strong>
+      </div>
+      <a href="/ui/bills?status_filter={{ status_filter }}" style="color: var(--text-muted); text-decoration: none; font-size: 13px;">✕ Dismiss</a>
+    </div>
+    {% endif %}
+
+    <!-- KPI SUMMARY STRIP (CLICKABLE FILTER CARDS) -->
+    <div class="metrics-strip">
+      <a href="/ui/bills?status_filter=ALL" class="metric-card {% if status_filter == 'ALL' %}active-card{% endif %}" title="Click to view all bills">
+        <div class="metric-top">
+          <span class="metric-label">Total Inward Bills</span>
+          <div class="metric-badge badge-blue">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="metric-value">{{ metrics.total if metrics else bills|length }}</div>
+        <div class="metric-sub">Lifetime WhatsApp intake</div>
+      </a>
+
+      <a href="/ui/bills?status_filter=REVIEW" class="metric-card {% if status_filter == 'REVIEW' %}active-card{% endif %}" title="Click to filter bills requiring review">
+        <div class="metric-top">
+          <span class="metric-label">Awaiting Review</span>
+          <div class="metric-badge badge-amber">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="metric-value" style="color: #b45309;">{{ metrics.review if metrics else 0 }}</div>
+        <div class="metric-sub">Manager action required</div>
+      </a>
+
+      <a href="/ui/bills?status_filter=QUEUED" class="metric-card {% if status_filter == 'QUEUED' %}active-card{% endif %}" title="Click to filter queued bills">
+        <div class="metric-top">
+          <span class="metric-label">Queue & OCR Scanning</span>
+          <div class="metric-badge badge-cyan">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="metric-value">
+          {{ (metrics.queued + metrics.scanning) if metrics else 0 }}
+        </div>
+        <div class="metric-sub">Queued ({{ metrics.queued if metrics else 0 }}) · Scan ({{ metrics.scanning if metrics else 0 }})</div>
+      </a>
+
+      <a href="/ui/bills?status_filter=POSTED" class="metric-card {% if status_filter == 'POSTED' %}active-card{% endif %}" title="Click to filter posted purchases">
+        <div class="metric-top">
+          <span class="metric-label">Verified & Posted</span>
+          <div class="metric-badge badge-emerald">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="metric-value" style="color: #15803d;">{{ metrics.posted if metrics else 0 }}</div>
+        <div class="metric-sub">Committed to purchase ledger</div>
+      </a>
+
+      <div class="metric-card">
+        <div class="metric-top">
+          <span class="metric-label">Price-Gap Alerts</span>
+          <div class="metric-badge badge-rose">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="metric-value" style="font-size: 21px; margin-top: 14px;">
+          {% if has_pending_alert %}
+          <span style="color: #dc2626;">Pending Dispatch</span>
+          {% else %}
+          <span style="color: #059669; font-size: 18px;">All Dispatched</span>
+          {% endif %}
+        </div>
+        <div class="metric-sub">Outbox monitor (>= 2% gap)</div>
+      </div>
+    </div>
+
+    <!-- CONTROLS & FILTER BAR -->
+    <div class="controls-wrapper">
+      <div class="filter-pills">
+        <a href="/ui/bills?status_filter=ALL" class="filter-pill {% if status_filter == 'ALL' %}active{% endif %}">
+          <span>ALL</span>
+          <span class="filter-pill-count">{{ status_counts.ALL if status_counts else bills|length }}</span>
+        </a>
+        {% for st in statuses %}
+        <a href="/ui/bills?status_filter={{ st }}" class="filter-pill {% if status_filter == st %}active{% endif %}">
+          <span>{{ st }}</span>
+          <span class="filter-pill-count">{{ status_counts[st] if status_counts and st in status_counts else '0' }}</span>
+        </a>
+        {% endfor %}
+      </div>
+
+      <div class="search-wrapper">
+        <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+        <input type="text" id="billSearch" class="search-input" placeholder="Search bill ID, supplier, invoice, or phone...">
+      </div>
+    </div>
+
+    <!-- DATA TABLE CARD -->
+    <div class="table-card">
+      <div class="table-container">
+        <table id="billsTable">
+          <thead>
+            <tr>
+              <th>Bill ID</th>
+              <th>Received</th>
+              <th>Sender</th>
+              <th>Status</th>
+              <th>Supplier (Extracted)</th>
+              <th>Invoice No</th>
+              <th style="text-align: right;">Net Total (INR)</th>
+              <th style="text-align: center;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in bills %}
+            <tr class="bill-row" data-search="{{ b.bill_id|lower }} {{ (b.supplier_raw or '')|lower }} {{ (b.invoice_no or '')|lower }} {{ b.sender|lower }}">
+              <td>
+                <span class="bill-code" title="{{ b.bill_id }}">
+                  {{ b.bill_id[:18] }}{{ '...' if b.bill_id|length > 18 else '' }}
+                </span>
+              </td>
+              <td style="color: var(--text-muted); white-space: nowrap;">
+                {{ b.received_at.strftime('%d-%b-%Y %H:%M') if b.received_at else '-' }}
+              </td>
+              <td>
+                <span class="sender-badge">
+                  <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" style="color: #16a34a;">
+                    <path d="M12.031 2C6.496 2 2 6.496 2 12.031c0 1.953.563 3.773 1.531 5.313L2 22l4.828-1.5a10.015 10.015 0 005.203 1.531c5.535 0 10.031-4.496 10.031-10.031S17.566 2 12.031 2z"></path>
+                  </svg>
+                  {{ b.sender }}
+                </span>
+              </td>
+              <td>
+                <span class="status-pill badge-{{ b.status.value }}">
+                  <span class="status-dot"></span>
+                  {{ b.status.value }}
+                </span>
+              </td>
+              <td style="font-weight: 600; color: var(--text-main);">
+                {{ b.supplier_raw or '<span style="color:#94a3b8; font-weight:normal;">Pending Scan</span>'|safe }}
+              </td>
+              <td>
+                {% if b.invoice_no %}
+                <span style="font-family: var(--font-mono); font-size: 13px;">{{ b.invoice_no }}</span>
+                {% else %}
+                <span style="color: var(--text-dim);">-</span>
+                {% endif %}
+              </td>
+              <td class="currency-amt">
+                {% if b.verified_net_total is not none %}
+                  ₹{{ "%.2f"|format(b.verified_net_total) }}
+                {% elif b.invoice_total %}
+                  ₹{{ b.invoice_total }}
+                {% else %}
+                  <span style="color: var(--text-dim);">-</span>
+                {% endif %}
+              </td>
+              <td style="text-align: center; white-space: nowrap;">
+                <a href="/ui/bills/{{ b.bill_id }}" class="btn-action {% if b.status.value == 'REVIEW' %}btn-action-highlight{% endif %}">
+                  Review Bill &rarr;
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="8">
+                <div class="empty-state-box">
+                  <div class="empty-icon-wrap">
+                    <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                  </div>
+                  <div class="empty-title">No bills found under filter "{{ status_filter }}"</div>
+                  <div class="empty-desc">There are currently no purchase bills in this state.</div>
+                  <a href="/ui/bills?status_filter=ALL" class="btn btn-secondary">
+                    Reset Filter · View All Bills
+                  </a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <div>AI Bill Scanner Automation · Kirana Purchase Intelligence Architecture</div>
+      <div>Timezone: Asia/Kolkata (IST) · Rates: Integer Paise (EX_GST)</div>
+    </footer>
+
+  </div>
+
+  <!-- INSTANT CLIENT-SIDE SEARCH SCRIPT -->
+  <script>
+    const searchInput = document.getElementById('billSearch');
+    if (searchInput) {
+      searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase().trim();
+        const rows = document.querySelectorAll('.bill-row');
+        rows.forEach(row => {
+          const text = row.getAttribute('data-search') || '';
+          row.style.display = text.includes(query) ? '' : 'none';
+        });
+      });
+    }
+  </script>
+</body>
+</html>

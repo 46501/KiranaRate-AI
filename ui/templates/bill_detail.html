@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bill Review — {{ bill.bill_id }}</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --surface-subtle: #f1f5f9;
+      --surface-muted: #f8fafc;
+      
+      --text-main: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      
+      --border: #e2e8f0;
+      --border-subtle: #edf2f7;
+      --border-focus: #3b82f6;
+
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-light: #eff6ff;
+      --primary-border: #bfdbfe;
+
+      --success: #059669;
+      --success-hover: #047857;
+      --success-light: #ecfdf5;
+      --success-border: #a7f3d0;
+
+      --warning: #d97706;
+      --warning-light: #fffbeb;
+      --warning-border: #fde68a;
+
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --danger-light: #fef2f2;
+      --danger-border: #fecaca;
+
+      --info: #0284c7;
+      --info-light: #f0f9ff;
+      --info-border: #bae6fd;
+
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-card: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+      --shadow-hover: 0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+      
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text-body);
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app-wrapper {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 32px 48px;
+    }
+
+    /* TOP HEADER */
+    header.detail-header {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: color 0.15s;
+      width: fit-content;
+    }
+
+    .back-btn:hover {
+      color: var(--primary);
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .title-row h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    .bill-id-tag {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .meta-bar {
+      display: flex;
+      gap: 18px;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      margin-top: 2px;
+      flex-wrap: wrap;
+    }
+
+    .meta-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* SEMANTIC STATUS PILLS */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .badge-QUEUED { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+    .badge-QUEUED .status-dot { background: #94a3b8; }
+
+    .badge-SCANNING { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+    .badge-SCANNING .status-dot { background: #0284c7; box-shadow: 0 0 4px #0284c7; }
+
+    .badge-REVIEW { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+    .badge-REVIEW .status-dot { background: #d97706; }
+
+    .badge-APPROVED { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+    .badge-APPROVED .status-dot { background: #10b981; }
+
+    .badge-POSTED { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-POSTED .status-dot { background: #16a34a; }
+
+    .badge-REJECTED { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+    .badge-REJECTED .status-dot { background: #dc2626; }
+
+    /* TOASTS & BANNERS */
+    .banner-toast {
+      background: #ffffff;
+      border: 1px solid var(--primary-border);
+      border-left: 4px solid var(--primary);
+      border-radius: 8px;
+      padding: 12px 18px;
+      margin-bottom: 24px;
+      color: var(--text-main);
+      font-size: 13.5px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .banner-danger {
+      background: #fff5f5;
+      border: 1px solid var(--danger-border);
+      border-left: 4px solid var(--danger);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+      color: #991b1b;
+      font-size: 13.5px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .banner-warning {
+      background: #fffdf5;
+      border: 1px solid var(--warning-border);
+      border-left: 4px solid var(--warning);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 24px;
+      color: #92400e;
+      font-size: 13px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    /* STRUCTURED TWO-COLUMN WORKSPACE */
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    @media (max-width: 1024px) {
+      .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* CARDS */
+    .panel-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 14px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .panel-step-badge {
+      background: var(--primary-light);
+      border: 1px solid var(--primary-border);
+      color: var(--primary);
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .panel-sub {
+      color: var(--text-muted);
+      font-size: 12.5px;
+    }
+
+    /* EXTRACTED FACTS GRID */
+    .facts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+    }
+
+    .fact-item {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+
+    .fact-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .fact-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-top: 3px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .fact-mono {
+      font-family: var(--font-mono);
+    }
+
+    /* SCANNED ITEMS TABLE */
+    .raw-table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+
+    table.raw-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      text-align: left;
+    }
+
+    table.raw-table th {
+      background: #f8fafc;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    table.raw-table td {
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--text-body);
+      font-variant-numeric: tabular-nums;
+    }
+
+    table.raw-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* FORM ELEMENTS */
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    label .req {
+      color: var(--danger);
+    }
+
+    input[type="text"],
+    input[type="date"],
+    input[type="number"],
+    select,
+    textarea {
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 7px;
+      font-size: 13.5px;
+      outline: none;
+      transition: all 0.15s;
+    }
+
+    input[type="text"]:focus,
+    input[type="date"]:focus,
+    input[type="number"]:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    }
+
+    input[readonly] {
+      background: var(--surface-subtle);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    /* LINE ITEM CARDS IN CONSOLE */
+    .item-verify-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+    }
+
+    .item-verify-card:hover {
+      border-color: #cbd5e1;
+    }
+
+    .item-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .item-raw-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .item-printed-stat {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      background: #ffffff;
+      border: 1px solid var(--border);
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .item-controls-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .item-check-row {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--text-body);
+    }
+
+    .item-check-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    /* RECONCILIATION SUMMARY BAR */
+    .reconciliation-panel {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .recon-metric-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .recon-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .recon-num {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .recon-match-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .recon-match {
+      background: var(--success-light);
+      border: 1px solid var(--success-border);
+      color: var(--success);
+    }
+
+    .recon-mismatch {
+      background: var(--warning-light);
+      border: 1px solid var(--warning-border);
+      color: #b45309;
+    }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn-secondary {
+      background: #ffffff;
+      color: var(--text-body);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--surface-subtle);
+      border-color: #cbd5e1;
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: #ffffff;
+      border-color: var(--success);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .btn-success:hover {
+      background: var(--success-hover);
+      box-shadow: 0 2px 8px rgba(5, 150, 105, 0.25);
+    }
+
+    .btn-danger {
+      background: var(--danger);
+      color: #ffffff;
+      border-color: var(--danger);
+    }
+
+    .btn-danger:hover {
+      background: var(--danger-hover);
+      box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+    }
+
+    .btn-lg {
+      width: 100%;
+      padding: 12px 20px;
+      font-size: 14.5px;
+    }
+
+    .card-rejection-box {
+      border: 1px solid var(--danger-border);
+      background: #ffffff;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-wrapper">
+
+    <!-- TOP HEADER -->
+    <header class="detail-header">
+      <div class="header-left">
+        <div>
+          <a href="/ui/bills" class="btn-secondary back-btn">&larr; Back to Dashboard</a>
+        </div>
+        <div class="title-row" style="margin-top: 4px;">
+          <h1>Bill Review</h1>
+          <span class="bill-id-tag">{{ bill.bill_id }}</span>
+        </div>
+        <div class="meta-bar">
+          <span class="meta-item">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            Received: {{ bill.received_at.strftime('%d-%b-%Y %H:%M IST') if bill.received_at else '-' }}
+          </span>
+          <span class="meta-item">
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" style="color: #16a34a;">
+              <path d="M12.031 2C6.496 2 2 6.496 2 12.031c0 1.953.563 3.773 1.531 5.313L2 22l4.828-1.5a10.015 10.015 0 005.203 1.531c5.535 0 10.031-4.496 10.031-10.031S17.566 2 12.031 2z"></path>
+            </svg>
+            Sender: {{ bill.sender }}
+          </span>
+          <span class="meta-item">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            Media: {{ bill.media_id or '-' }} ({{ bill.mime_type or 'image/jpeg' }})
+          </span>
+        </div>
+      </div>
+
+      <div>
+        <span class="status-pill badge-{{ bill.status.value }}">
+          <span class="status-dot"></span>
+          Status: {{ bill.status.value }}
+        </span>
+      </div>
+    </header>
+
+    <!-- NOTIFICATION BANNERS -->
+    {% if msg %}
+    <div class="banner-toast">
+      <strong>{{ msg }}</strong>
+    </div>
+    {% endif %}
+
+    {% if bill.reason %}
+    <div class="banner-danger">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      </svg>
+      <div>
+        <strong>Verification Failure / Reason:</strong> {{ bill.reason }}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if bill.notes %}
+    <div class="banner-warning">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <div>
+        <strong>Gemini AI Scan Notes:</strong> {{ bill.notes }}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- TWO-COLUMN WORKSPACE -->
+    <div class="workspace-grid">
+
+      <!-- LEFT COLUMN: EXTRACTED INVOICE & RAW SCANNED LINE ITEMS -->
+      <div class="col-extracted">
+        
+        <!-- EXTRACTED FACTS -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--primary);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Extracted Invoice Facts
+            </h2>
+            <span class="panel-sub">Gemini Vision OCR</span>
+          </div>
+
+          <div class="facts-grid">
+            <div class="fact-item">
+              <div class="fact-label">Extracted Supplier</div>
+              <div class="fact-value">{{ bill.supplier_raw or '<span style="color:var(--text-dim); font-weight:normal;">Pending Scan</span>'|safe }}</div>
+            </div>
+            <div class="fact-item">
+              <div class="fact-label">Extracted Invoice No</div>
+              <div class="fact-value fact-mono">{{ bill.invoice_no or '<span style="color:var(--text-dim); font-weight:normal;">-</span>'|safe }}</div>
+            </div>
+            <div class="fact-item">
+              <div class="fact-label">Extracted Date</div>
+              <div class="fact-value fact-mono">{{ bill.invoice_date or '<span style="color:var(--text-dim); font-weight:normal;">-</span>'|safe }}</div>
+            </div>
+            <div class="fact-item">
+              <div class="fact-label">Extracted Total (INR)</div>
+              <div class="fact-value fact-mono" style="color: var(--primary);">
+                {% if bill.invoice_total %}₹{{ bill.invoice_total }}{% else %}-{% endif %}
+              </div>
+            </div>
+            <div class="fact-item">
+              <div class="fact-label">Cost Basis</div>
+              <div class="fact-value">EX_GST (Pre-tax)</div>
+            </div>
+            <div class="fact-item">
+              <div class="fact-label">Currency</div>
+              <div class="fact-value">INR (₹)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RAW SCANNED LINE ITEMS TABLE -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <h2 class="panel-title">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: var(--primary);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+              </svg>
+              Scanned Line Items ({{ lines|length }})
+            </h2>
+            <span class="panel-sub">Printed on Bill Image</span>
+          </div>
+
+          <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 12px 0;">
+            Compare these extracted raw printed values against your verification inputs on the right.
+          </p>
+
+          <div class="raw-table-wrap">
+            <table class="raw-table">
+              <thead>
+                <tr>
+                  <th style="width: 32px; text-align: center;">#</th>
+                  <th>Product & Pack (Raw)</th>
+                  <th>Quantity / Unit</th>
+                  <th>Printed Rate</th>
+                  <th style="text-align: right;">Line Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for ln in lines %}
+                <tr>
+                  <td style="text-align: center; color: var(--text-dim); font-family: var(--font-mono);">
+                    {{ ln.line_no }}
+                  </td>
+                  <td>
+                    <div style="font-weight: 600; color: var(--text-main);">{{ ln.product_raw }}</div>
+                    {% if ln.pack_raw %}
+                    <div style="font-size: 11.5px; color: var(--text-muted);">Pack: {{ ln.pack_raw }}</div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {{ ln.quantity_raw or '-' }} {{ ln.unit_raw or '' }}
+                  </td>
+                  <td style="font-family: var(--font-mono);">
+                    ₹{{ ln.rate_raw or '-' }}
+                  </td>
+                  <td style="font-family: var(--font-mono); font-weight: 600; text-align: right;">
+                    ₹{{ ln.line_total_raw or '-' }}
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 28px;">
+                    No line items extracted for this bill yet.
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: REVIEWER VERIFICATION & APPROVAL CONSOLE -->
+      <div class="col-verification">
+        
+        <form action="/ui/bills/{{ bill.bill_id }}/approve" method="POST" id="approvalForm">
+
+          <!-- 1. HEADER VERIFICATION CARD -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <h2 class="panel-title">
+                <span class="panel-step-badge">1</span>
+                Header & Supplier Verification
+              </h2>
+              <span class="panel-sub">Pre-tax EX_GST</span>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Reviewer Name <span class="req">*</span></label>
+                <input type="text" name="reviewer" value="{{ bill.reviewer or 'store_manager' }}" required placeholder="e.g. store_manager">
+              </div>
+
+              <div class="form-group">
+                <label>Supplier <span class="req">*</span></label>
+                <select name="supplier_id" required>
+                  <option value="">-- Choose Active Supplier --</option>
+                  {% for s in suppliers %}
+                  <option value="{{ s.supplier_id }}" {% if bill.supplier_id == s.supplier_id %}selected{% endif %}>
+                    {{ s.supplier_name }} ({{ s.supplier_id }})
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Invoice Number <span class="req">*</span></label>
+                <input type="text" name="invoice_no" value="{{ bill.invoice_no or '' }}" required placeholder="e.g. INV-2026-001">
+              </div>
+
+              <div class="form-group">
+                <label>Invoice Date (YYYY-MM-DD) <span class="req">*</span></label>
+                <input type="date" name="invoice_date" value="{{ bill.invoice_date or '' }}" required>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Verified Net Total (INR) <span class="req">*</span></label>
+                <input type="text" name="verified_net_total" id="verifiedNetTotal" value="{{ bill.verified_net_total or bill.invoice_total or '' }}" required placeholder="e.g. 500.00" style="font-family: var(--font-mono); font-weight: 600;">
+              </div>
+
+              <div class="form-group">
+                <label>Header Verified <span class="req">*</span></label>
+                <select name="header_verified" required>
+                  <option value="YES" {% if bill.header_verified and bill.header_verified.value == 'YES' %}selected{% endif %}>YES (Confirmed from Image)</option>
+                  <option value="NO" {% if not bill.header_verified or bill.header_verified.value == 'NO' %}selected{% endif %}>NO (Unverified)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. SKU MAPPING & NORMALIZATION CARD -->
+          <div class="panel-card">
+            <div class="panel-header">
+              <h2 class="panel-title">
+                <span class="panel-step-badge">2</span>
+                SKU Normalization & Received Units
+              </h2>
+              <span class="panel-sub">Integer Paise / Unit</span>
+            </div>
+
+            <p style="color: var(--text-muted); font-size: 13px; margin: 0 0 14px 0;">
+              Assign the canonical SKU, total received sale units (accounts for bonus/free packs), and net pre-tax amount (INR).
+            </p>
+
+            {% for ln in lines %}
+            <div class="item-verify-card">
+              <div class="item-top-row">
+                <div class="item-raw-title">#{{ ln.line_no }} — {{ ln.product_raw }}</div>
+                <div class="item-printed-stat">
+                  Printed: ₹{{ ln.rate_raw or '-' }} | Total: ₹{{ ln.line_total_raw or '-' }}
+                </div>
+              </div>
+
+              <div class="item-controls-grid">
+                <div class="form-group">
+                  <label>Canonical SKU <span class="req">*</span></label>
+                  <select name="sku_{{ ln.review_id }}" required>
+                    <option value="">-- Select Canonical SKU --</option>
+                    {% for p in products %}
+                    <option value="{{ p.sku }}" {% if ln.sku == p.sku %}selected{% endif %}>
+                      {{ p.sku }} ({{ p.product_name }})
+                    </option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label>Units <span class="req">*</span></label>
+                  <input type="number" class="line-units" name="units_{{ ln.review_id }}" value="{{ ln.received_units or ln.quantity_raw or '1' }}" min="1" required style="font-family: var(--font-mono); text-align: right;">
+                </div>
+
+                <div class="form-group">
+                  <label>Net Amount (₹) <span class="req">*</span></label>
+                  <input type="text" class="line-amt" name="amt_{{ ln.review_id }}" value="{{ ln.net_amount or ln.line_total_raw or '' }}" required style="font-family: var(--font-mono); text-align: right; font-weight: 600;">
+                </div>
+              </div>
+
+              <div class="item-check-row">
+                <input type="checkbox" id="rev_{{ ln.review_id }}" name="reviewed_{{ ln.review_id }}" value="YES" {% if ln.reviewed.value == 'YES' %}checked{% endif %}>
+                <label for="rev_{{ ln.review_id }}" style="font-size: 12.5px; text-transform: none; font-weight: 500; cursor: pointer;">
+                  Mark item verified & mapped
+                </label>
+              </div>
+            </div>
+            {% else %}
+            <div style="text-align: center; color: var(--text-muted); padding: 20px;">
+              No line items available to review.
+            </div>
+            {% endfor %}
+
+            <!-- RECONCILIATION SUMMARY BAR -->
+            {% if lines %}
+            <div class="reconciliation-panel">
+              <div class="recon-metric-col">
+                <span class="recon-label">Line Items</span>
+                <span class="recon-num">{{ lines|length }}</span>
+              </div>
+              <div class="recon-metric-col">
+                <span class="recon-label">Sum of Lines</span>
+                <span class="recon-num" id="linesTotalDisplay">₹0.00</span>
+              </div>
+              <div class="recon-metric-col">
+                <span class="recon-label">Verified Total</span>
+                <span class="recon-num" id="verifiedTotalDisplay">₹{{ bill.verified_net_total or bill.invoice_total or '0.00' }}</span>
+              </div>
+              <div>
+                <span class="recon-match-pill recon-match" id="reconBadge">
+                  ● Live Reconciliation Active
+                </span>
+              </div>
+            </div>
+            {% endif %}
+
+            <div style="margin-top: 18px;">
+              <button type="submit" class="btn btn-success btn-lg">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                </svg>
+                ✓ Save & Approve Bill
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <!-- REJECTION PANEL -->
+        <div class="panel-card card-rejection-box">
+          <div class="panel-header" style="border-color: #fee2e2;">
+            <h2 class="panel-title" style="color: var(--danger);">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+              </svg>
+              Reject Bill Permanently
+            </h2>
+            <span class="panel-sub" style="color: #ef4444;">Unreadable / Invalid</span>
+          </div>
+
+          <form action="/ui/bills/{{ bill.bill_id }}/reject" method="POST">
+            <div class="form-grid-2">
+              <div class="form-group">
+                <label>Reviewer Name <span class="req">*</span></label>
+                <input type="text" name="reviewer" value="{{ bill.reviewer or 'store_manager' }}" required placeholder="e.g. store_manager">
+              </div>
+              <div class="form-group">
+                <label>Rejection Reason <span class="req">*</span></label>
+                <input type="text" name="reason" placeholder="e.g. Blurred photo, incomplete invoice, wrong vendor" required>
+              </div>
+            </div>
+
+            <div style="margin-top: 14px; text-align: right;">
+              <button type="submit" class="btn btn-danger">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+                ✕ Reject Bill
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- LIVE RECONCILIATION JAVASCRIPT -->
+  <script>
+    function updateReconciliation() {
+      const netTotalInput = document.getElementById('verifiedNetTotal');
+      const amtInputs = document.querySelectorAll('.line-amt');
+      const linesTotalDisplay = document.getElementById('linesTotalDisplay');
+      const verifiedTotalDisplay = document.getElementById('verifiedTotalDisplay');
+      const reconBadge = document.getElementById('reconBadge');
+
+      if (!linesTotalDisplay || !netTotalInput) return;
+
+      let sum = 0;
+      amtInputs.forEach(input => {
+        const val = parseFloat(input.value) || 0;
+        sum += val;
+      });
+
+      const verified = parseFloat(netTotalInput.value) || 0;
+      linesTotalDisplay.textContent = '₹' + sum.toFixed(2);
+      verifiedTotalDisplay.textContent = '₹' + verified.toFixed(2);
+
+      const diff = Math.abs(sum - verified);
+      if (diff < 0.01) {
+        reconBadge.className = 'recon-match-pill recon-match';
+        reconBadge.textContent = '✓ Line amounts match verified net total';
+      } else {
+        reconBadge.className = 'recon-match-pill recon-mismatch';
+        reconBadge.textContent = '⚠ Variance: ₹' + (sum - verified).toFixed(2);
+      }
+    }
+
+    document.querySelectorAll('.line-amt').forEach(el => {
+      el.addEventListener('input', updateReconciliation);
+    });
+
+    const netTotalInput = document.getElementById('verifiedNetTotal');
+    if (netTotalInput) {
+      netTotalInput.addEventListener('input', updateReconciliation);
+    }
+
+    // Run on page load
+    updateReconciliation();
+  </script>
+</body>
+</html>
