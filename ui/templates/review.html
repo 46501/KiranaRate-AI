@@ -1035,6 +1035,14 @@
       </div>
 
       <div class="navbar-actions">
+        <!-- Direct Upload Button -->
+        <button type="button" class="btn btn-primary" onclick="openUploadModal()" style="display:inline-flex; align-items:center; gap:6px;">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+          </svg>
+          <span>+ Upload Bill</span>
+        </button>
+
         <!-- Worker Controls -->
         <form action="/ui/workers/run/scan" method="POST" style="margin:0;">
           <button type="submit" class="btn btn-worker" title="Scan oldest queued bill with Gemini Vision">
@@ -1213,6 +1221,21 @@
               Showing <strong>{{ bills|length }}</strong> bills in current view (sorted FIFO by oldest received first)
             </div>
           </div>
+
+          <div style="display:flex; align-items:center; gap:8px;">
+            <a href="/bills/export/csv" class="btn btn-secondary" title="Download Excel CSV of all purchases" style="font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Export CSV (Excel)
+            </a>
+            <a href="/bills/export/tally" class="btn btn-secondary" title="Export XML vouchers for Tally Prime import" style="font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px;">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
+              Export Tally XML
+            </a>
+          </div>
         </div>
 
         <!-- CONTROLS & FILTER BAR -->
@@ -1329,6 +1352,53 @@
 
       <!-- VIEW 2: PRICE INTELLIGENCE -->
       {% if current_view == 'price-intelligence' %}
+      {% if sku_analytics %}
+      <div class="content-card" style="margin-bottom:20px;">
+        <div class="card-header-bar">
+          <div>
+            <h3 class="card-header-title">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--primary);">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+              </svg>
+              SKU Rate Volatility & Price Intelligence
+            </h3>
+            <div class="card-header-sub">
+              Historical purchase rate range, volatility spread, and latest price movements across recorded products.
+            </div>
+          </div>
+        </div>
+        <div style="padding:18px 22px; display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+          {% for item in sku_analytics %}
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+              <div>
+                <span style="font-size:11px; font-weight:700; color:var(--primary); font-family:var(--font-mono);">{{ item.sku }}</span>
+                <div style="font-size:13.5px; font-weight:700; color:var(--text-main); margin-top:2px;">{{ item.product_name }}</div>
+              </div>
+              <span style="font-size:11px; font-weight:700; padding:2px 7px; border-radius:12px; {% if item.volatility > 5 %}background:#fee2e2; color:#dc2626; border:1px solid #fecaca;{% else %}background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;{% endif %}">
+                {{ "%.1f"|format(item.volatility) }}% Volatility
+              </span>
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid #eaecf0;">
+              <div>
+                <span style="font-size:11px; color:var(--text-muted);">Latest Rate</span>
+                <div style="font-size:13.5px; font-weight:700; color:var(--text-main); font-family:var(--font-mono);">₹{{ "%.2f"|format(item.latest_rate) }}</div>
+              </div>
+              <div>
+                <span style="font-size:11px; color:#059669;">Lowest Paid</span>
+                <div style="font-size:13.5px; font-weight:700; color:#059669; font-family:var(--font-mono);">₹{{ "%.2f"|format(item.min_rate) }}</div>
+              </div>
+              <div>
+                <span style="font-size:11px; color:#dc2626;">Highest Paid</span>
+                <div style="font-size:13.5px; font-weight:700; color:#dc2626; font-family:var(--font-mono);">₹{{ "%.2f"|format(item.max_rate) }}</div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
       <div class="content-card">
         <div class="card-header-bar">
           <div>
@@ -1530,8 +1600,88 @@
 
   </main>
 
-  <!-- INSTANT CLIENT-SIDE SEARCH SCRIPT -->
+  <!-- UPLOAD BILL MODAL -->
+  <div id="uploadModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:9999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(2px);">
+    <div style="background:#ffffff; border-radius:14px; max-width:480px; width:100%; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); border:1px solid var(--border); overflow:hidden;">
+      <div style="padding:18px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0; font-size:16px; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" fill="none" stroke="var(--primary)" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+          </svg>
+          Direct Bill Inward Upload
+        </h3>
+        <button type="button" onclick="closeUploadModal()" style="background:transparent; border:none; font-size:18px; color:var(--text-muted); cursor:pointer;">✕</button>
+      </div>
+
+      <form action="/ui/upload" method="POST" enctype="multipart/form-data" style="padding:22px 24px; margin:0;">
+        <p style="font-size:13px; color:var(--text-muted); margin:0 0 16px 0;">
+          Upload a paper bill photo or digital invoice image (JPEG / PNG). It will be queued for Gemini Vision OCR and price arbitrage extraction.
+        </p>
+
+        <div style="border:2px dashed #cbd5e1; border-radius:10px; padding:28px 16px; text-align:center; background:#f8fafc; cursor:pointer;" onclick="document.getElementById('billFileInput').click();" ondragover="event.preventDefault(); this.style.borderColor='var(--primary)';" ondragleave="this.style.borderColor='#cbd5e1';" ondrop="handleDrop(event, this)">
+          <svg width="36" height="36" fill="none" stroke="#94a3b8" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 10px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"></path>
+          </svg>
+          <div style="font-size:13.5px; font-weight:600; color:var(--text-main); margin-bottom:4px;" id="fileSelectPrompt">
+            Click to select or drag & drop invoice image
+          </div>
+          <div style="font-size:11.5px; color:var(--text-muted);" id="fileSelectedLabel">
+            Supported: JPEG, PNG · Maximum 5 MiB
+          </div>
+          <input type="file" id="billFileInput" name="file" accept="image/jpeg,image/png" required style="display:none;" onchange="updateFileName(this)">
+        </div>
+
+        <div style="margin-top:16px; display:flex; align-items:center; gap:8px;">
+          <input type="checkbox" id="scan_now" name="scan_now" value="true" checked style="accent-color:var(--primary); cursor:pointer;">
+          <label for="scan_now" style="font-size:13px; color:var(--text-main); cursor:pointer; font-weight:500;">
+            Run AI Scan Worker immediately after upload
+          </label>
+        </div>
+
+        <div style="margin-top:22px; display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="btn btn-secondary" onclick="closeUploadModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="display:flex; align-items:center; gap:6px;">
+            Upload & Process Bill
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- INSTANT CLIENT-SIDE SEARCH & MODAL SCRIPT -->
   <script>
+    function openUploadModal() {
+      const modal = document.getElementById('uploadModal');
+      if (modal) {
+        modal.style.display = 'flex';
+      }
+    }
+
+    function closeUploadModal() {
+      const modal = document.getElementById('uploadModal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    }
+
+    function updateFileName(input) {
+      if (input.files && input.files[0]) {
+        const file = input.files[0];
+        document.getElementById('fileSelectPrompt').textContent = 'Selected: ' + file.name;
+        document.getElementById('fileSelectedLabel').textContent = (file.size / 1024).toFixed(1) + ' KB · ' + file.type;
+      }
+    }
+
+    function handleDrop(e, dropzone) {
+      e.preventDefault();
+      dropzone.style.borderColor = '#cbd5e1';
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        const fileInput = document.getElementById('billFileInput');
+        fileInput.files = e.dataTransfer.files;
+        updateFileName(fileInput);
+      }
+    }
+
     const searchInput = document.getElementById('billSearch');
     if (searchInput) {
       searchInput.addEventListener('input', function() {

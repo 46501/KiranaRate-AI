@@ -15,7 +15,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Form, HTTPException, Request, Response, status
+from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -29,6 +29,7 @@ from app.models import (
     Reviewed,
 )
 from app.services.gemini_scanner import GeminiScanner, MockGeminiScanner
+from app.services.sku_matcher import SKUMatcher
 from app.services.whatsapp import MockWhatsAppClient, WhatsAppClient
 from app.services.workflow_engine import WorkflowEngine
 from app.storage.sqlite_store import SQLiteStore
@@ -256,6 +257,27 @@ async def ui_bills_dashboard(
     scheduler = getattr(request.app.state, "scheduler", None)
     scheduler_running = scheduler.running if scheduler else False
 
+    # SKU Price Intelligence Summary
+    sku_analytics = []
+    for prod in products:
+        p_list = store.get_purchases_for_sku(prod.sku)
+        if p_list:
+            rates_inr = [round(p.net_paise / (p.units * 100), 2) for p in p_list if p.units > 0]
+            min_r = min(rates_inr)
+            max_r = max(rates_inr)
+            latest_r = rates_inr[-1]
+            volatility = round(((max_r - min_r) / min_r) * 100, 2) if min_r > 0 else 0.0
+            sku_analytics.append({
+                "sku": prod.sku,
+                "product_name": prod.product_name,
+                "count": len(p_list),
+                "latest_rate": latest_r,
+                "min_rate": min_r,
+                "max_rate": max_r,
+                "volatility": volatility,
+                "purchases": p_list,
+            })
+
     return templates.TemplateResponse(
         request=request,
         name="review.html",
@@ -271,6 +293,7 @@ async def ui_bills_dashboard(
             "suppliers": suppliers,
             "products": products,
             "purchases": purchases,
+            "sku_analytics": sku_analytics,
             "alerts": alerts,
             "current_view": view or "overview",
             "now_ist": now_ist,
@@ -278,6 +301,45 @@ async def ui_bills_dashboard(
             "settings": request.app.state.settings,
         },
     )
+
+
+@app.post("/ui/upload")
+async def ui_upload_bill(
+    request: Request,
+    file: UploadFile = File(...),
+    scan_now: bool = Form(False),
+):
+    """Handle direct file upload from web UI and optionally trigger scan immediately."""
+    engine: WorkflowEngine = request.app.state.engine
+    content = await file.read()
+    if not content:
+        return RedirectResponse(
+            url="/ui/bills?msg=Upload+failed:+Uploaded+file+was+empty",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    try:
+        bill_id = await engine.intake_uploaded_bill(
+            image_bytes=content,
+            filename=file.filename or "uploaded_bill.jpg",
+            mime_type=file.content_type or "image/jpeg",
+            sender="web-dashboard",
+        )
+        if scan_now:
+            await engine.run_scan_worker()
+            return RedirectResponse(
+                url=f"/ui/bills/{bill_id}?msg=Bill+uploaded+and+scanned+successfully",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+        return RedirectResponse(
+            url=f"/ui/bills?status_filter=QUEUED&msg=Bill+{bill_id}+uploaded+successfully+and+queued+for+scan",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    except Exception as exc:
+        logger.error("Web UI upload failed: %s", exc)
+        return RedirectResponse(
+            url=f"/ui/bills?msg=Upload+failed:+{str(exc)}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
 
 
 @app.get("/ui/bills/{bill_id}", response_class=HTMLResponse)
@@ -291,6 +353,18 @@ async def ui_bill_detail(request: Request, bill_id: str, msg: Optional[str] = No
     lines = store.get_review_lines(bill_id)
     suppliers = store.list_suppliers(active_only=True)
     products = store.list_products(active_only=True)
+
+    # Compute intelligent fuzzy SKU suggestions for unmapped lines
+    suggestions = {}
+    for ln in lines:
+        best = SKUMatcher.get_best_match(ln.product_raw, ln.pack_raw, products, auto_threshold=0.45)
+        if best:
+            suggestions[ln.review_id] = {
+                "sku": best.sku,
+                "product_name": best.product_name,
+                "confidence": best.confidence_percent,
+                "matched_pack": best.matched_pack,
+            }
 
     # Check for image file on disk
     image_url = None
@@ -309,6 +383,7 @@ async def ui_bill_detail(request: Request, bill_id: str, msg: Optional[str] = No
             "lines": lines,
             "suppliers": suppliers,
             "products": products,
+            "suggestions": suggestions,
             "msg": msg,
             "image_url": image_url,
         },

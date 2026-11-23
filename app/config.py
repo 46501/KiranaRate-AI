@@ -8,7 +8,7 @@ can be tuned without touching source code.
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Union
 
 from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -55,7 +55,7 @@ class Settings(BaseSettings):
         description="E.164 phone number of the account owner who receives alert messages.",
     )
 
-    whatsapp_allowlist: List[str] = Field(
+    whatsapp_allowlist: Union[List[str], str] = Field(
         default_factory=list,
         validation_alias=AliasChoices("whatsapp_allowlist", "whatsapp_allowed_senders"),
         description="List of sender phone numbers permitted to submit bills.",

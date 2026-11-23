@@ -970,15 +970,28 @@
 
               <div class="item-inputs-grid">
                 <div class="form-group">
-                  <label>Canonical SKU <span class="req">*</span></label>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                    <label style="margin:0;">Canonical SKU <span class="req">*</span></label>
+                    {% if suggestions and suggestions.get(ln.review_id) %}
+                    {% set sug = suggestions.get(ln.review_id) %}
+                    <span style="font-size:11px; font-weight:600; padding:2px 7px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; {% if sug.confidence >= 75 %}background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;{% else %}background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe;{% endif %}">
+                      ✨ {{ sug.confidence }}% Match
+                    </span>
+                    {% endif %}
+                  </div>
                   <select name="sku_{{ ln.review_id }}" required>
                     <option value="">-- Select Canonical SKU --</option>
                     {% for p in products %}
-                    <option value="{{ p.sku }}" {% if ln.sku == p.sku %}selected{% endif %}>
+                    <option value="{{ p.sku }}" {% if ln.sku == p.sku or (not ln.sku and suggestions and suggestions.get(ln.review_id) and suggestions[ln.review_id].sku == p.sku and suggestions[ln.review_id].confidence >= 65) %}selected{% endif %}>
                       {{ p.sku }} ({{ p.product_name }})
                     </option>
                     {% endfor %}
                   </select>
+                  {% if suggestions and suggestions.get(ln.review_id) and not ln.sku %}
+                  <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">
+                    Suggested: <strong>{{ suggestions[ln.review_id].sku }}</strong> ({{ suggestions[ln.review_id].product_name }})
+                  </div>
+                  {% endif %}
                 </div>
 
                 <div class="form-group">

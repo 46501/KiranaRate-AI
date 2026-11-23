@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import PlainTextResponse
 
 from app.api.dependencies import get_engine, get_settings, get_store
@@ -26,6 +26,8 @@ from app.schemas import (
     RejectRequest,
     ReviewLineResponse,
 )
+from app.services.accounting_export import AccountingExporter
+from app.services.sku_matcher import SKUMatcher
 from app.services.workflow_engine import WorkflowEngine
 from app.storage.base import BaseStore
 
@@ -150,6 +152,37 @@ async def list_bills(
     """List all bills, optionally filtered by status (oldest first)."""
     bills = store.list_bills(status=status)
     return [_bill_to_response(b) for b in bills]
+
+
+@router.post("/bills/upload")
+async def upload_bill(
+    file: UploadFile = File(...),
+    sender: str = Query("web-upload", description="Sender label or phone number"),
+    engine: WorkflowEngine = Depends(get_engine),
+) -> dict:
+    """
+    Directly upload an invoice image (JPEG or PNG) to queue it for AI scanning.
+    """
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty")
+    try:
+        bill_id = await engine.intake_uploaded_bill(
+            image_bytes=content,
+            filename=file.filename or "upload.jpg",
+            mime_type=file.content_type or "image/jpeg",
+            sender=sender,
+        )
+        return {
+            "status": "success",
+            "bill_id": bill_id,
+            "message": "Bill uploaded successfully and queued for AI scan.",
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception as exc:
+        logger.exception("Failed to intake uploaded bill: %s", exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process uploaded bill")
 
 
 @router.get("/bills/{bill_id}", response_model=BillResponse)
@@ -291,3 +324,168 @@ async def get_workers_status(
         },
         "jobs": jobs_info,
     }
+
+
+# ---------------------------------------------------------------------------
+# SKU Matching & Intelligence
+# ---------------------------------------------------------------------------
+
+@router.get("/sku/suggest")
+async def suggest_sku(
+    q: str = Query(..., description="Raw product description string from OCR"),
+    pack: Optional[str] = Query(None, description="Raw pack size or unit string"),
+    min_confidence: float = Query(0.35, ge=0.0, le=1.0, description="Minimum confidence threshold"),
+    store: BaseStore = Depends(get_store),
+) -> list[dict]:
+    """
+    Intelligent fuzzy SKU recommendation for invoice line items.
+    """
+    products = store.list_products(active_only=True)
+    matches = SKUMatcher.match(q, pack, products, min_confidence=min_confidence)
+    return [
+        {
+            "sku": m.sku,
+            "product_name": m.product_name,
+            "confidence": m.confidence,
+            "confidence_percent": m.confidence_percent,
+            "matched_pack": m.matched_pack,
+        }
+        for m in matches[:5]
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Purchase Price Analytics & Intelligence
+# ---------------------------------------------------------------------------
+
+@router.get("/analytics/sku-history")
+async def get_sku_price_history(
+    sku: str = Query(..., description="Canonical SKU identifier"),
+    store: BaseStore = Depends(get_store),
+) -> dict:
+    """
+    Historical purchase rate movement, volatility, and supplier breakdown for an SKU.
+    """
+    product = store.get_product(sku)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"SKU '{sku}' not found")
+
+    purchases = store.get_purchases_for_sku(sku)
+    suppliers_map = {s.supplier_id: s.supplier_name for s in store.list_suppliers()}
+
+    if not purchases:
+        return {
+            "sku": sku,
+            "product_name": product.product_name,
+            "purchase_count": 0,
+            "current_rate_inr": None,
+            "min_rate_inr": None,
+            "max_rate_inr": None,
+            "avg_rate_inr": None,
+            "volatility_percent": 0.0,
+            "total_units": 0,
+            "history": [],
+        }
+
+    rates_inr = [round(p.net_paise / (p.units * 100), 2) for p in purchases if p.units > 0]
+    total_units = sum(p.units for p in purchases)
+    min_rate = min(rates_inr) if rates_inr else 0.0
+    max_rate = max(rates_inr) if rates_inr else 0.0
+    avg_rate = round(sum(rates_inr) / len(rates_inr), 2) if rates_inr else 0.0
+    latest_rate = rates_inr[-1] if rates_inr else 0.0
+    volatility = round(((max_rate - min_rate) / min_rate) * 100, 2) if min_rate > 0 else 0.0
+
+    history = [
+        {
+            "purchase_id": p.purchase_id,
+            "bill_id": p.bill_id,
+            "invoice_date": p.invoice_date.isoformat(),
+            "supplier_id": p.supplier_id,
+            "supplier_name": suppliers_map.get(p.supplier_id, p.supplier_id),
+            "units": p.units,
+            "rate_inr": round(p.net_paise / (p.units * 100), 2) if p.units > 0 else 0.0,
+            "net_amount_inr": round(p.net_paise / 100, 2),
+            "posted_at": p.posted_at.isoformat(),
+        }
+        for p in purchases
+    ]
+
+    return {
+        "sku": sku,
+        "product_name": product.product_name,
+        "purchase_count": len(purchases),
+        "current_rate_inr": latest_rate,
+        "min_rate_inr": min_rate,
+        "max_rate_inr": max_rate,
+        "avg_rate_inr": avg_rate,
+        "volatility_percent": volatility,
+        "total_units": total_units,
+        "history": history,
+    }
+
+
+@router.get("/analytics/summary")
+async def get_analytics_summary(
+    store: BaseStore = Depends(get_store),
+) -> list[dict]:
+    """
+    Summary rate metrics across all products with posted purchase history.
+    """
+    products = store.list_products(active_only=True)
+    summary = []
+    for prod in products:
+        purchases = store.get_purchases_for_sku(prod.sku)
+        if purchases:
+            rates_inr = [round(p.net_paise / (p.units * 100), 2) for p in purchases if p.units > 0]
+            min_rate = min(rates_inr)
+            max_rate = max(rates_inr)
+            avg_rate = round(sum(rates_inr) / len(rates_inr), 2)
+            volatility = round(((max_rate - min_rate) / min_rate) * 100, 2) if min_rate > 0 else 0.0
+            summary.append({
+                "sku": prod.sku,
+                "product_name": prod.product_name,
+                "purchases_count": len(purchases),
+                "latest_rate_inr": rates_inr[-1],
+                "min_rate_inr": min_rate,
+                "max_rate_inr": max_rate,
+                "avg_rate_inr": avg_rate,
+                "volatility_percent": volatility,
+            })
+    return summary
+
+
+# ---------------------------------------------------------------------------
+# Accounting & ERP Exports (Excel CSV & Tally XML)
+# ---------------------------------------------------------------------------
+
+@router.get("/bills/export/csv")
+@router.get("/export/csv")
+async def export_purchases_csv(
+    store: BaseStore = Depends(get_store),
+) -> Response:
+    """Export purchase transactions to CSV for Excel / Google Sheets."""
+    csv_data = AccountingExporter.generate_csv(store)
+    filename = f"KiranaIQ_Purchases_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv"
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/bills/export/tally")
+@router.get("/export/tally")
+async def export_tally_xml(
+    store: BaseStore = Depends(get_store),
+) -> Response:
+    """Export posted purchase vouchers formatted for direct Tally Prime XML import."""
+    xml_data = AccountingExporter.generate_tally_xml(store)
+    filename = f"KiranaIQ_Tally_Vouchers_{datetime.now(timezone.utc).strftime('%Y%m%d')}.xml"
+    return Response(
+        content=xml_data,
+        media_type="application/xml",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+

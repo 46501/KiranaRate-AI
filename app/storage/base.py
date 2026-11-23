@@ -200,6 +200,10 @@ class BaseStore(ABC):
         """Return recently posted purchases (up to limit)."""
         return []
 
+    def get_purchases_for_sku(self, sku: str) -> list[Purchase]:
+        """Return all posted purchases for the given SKU ordered by invoice_date ascending."""
+        return []
+
     @abstractmethod
     def get_purchases_for_sku_since(
         self,

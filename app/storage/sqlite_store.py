@@ -857,6 +857,19 @@ class SQLiteStore(BaseStore):
         )
         return [_row_to_purchase(row) for row in cur.fetchall()]
 
+    def get_purchases_for_sku(self, sku: str) -> list[Purchase]:
+        """Return all posted purchases for the given SKU ordered by invoice_date ASC, posted_at ASC."""
+        conn = self._get_conn()
+        cur = conn.execute(
+            """
+            SELECT * FROM purchases
+            WHERE sku = ?
+            ORDER BY invoice_date ASC, posted_at ASC
+            """,
+            (sku,),
+        )
+        return [_row_to_purchase(row) for row in cur.fetchall()]
+
     def has_duplicate_invoice(
         self,
         supplier_id: str,

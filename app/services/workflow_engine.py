@@ -23,6 +23,7 @@ import os
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
 from typing import Optional
 
 import pytz
@@ -268,6 +269,59 @@ class WorkflowEngine:
 
         return inserted_ids
 
+    async def intake_uploaded_bill(
+        self,
+        image_bytes: bytes,
+        filename: str,
+        mime_type: str,
+        sender: str = "web-admin",
+    ) -> str:
+        """
+        Intake a bill uploaded directly via Web Dashboard.
+
+        1. Validate MIME type (jpeg/png only).
+        2. Validate file size (<= configured limit).
+        3. Save file into media directory.
+        4. Insert Bill record with status QUEUED.
+        """
+        # Normalize and validate MIME
+        clean_mime = (mime_type or "").lower().strip()
+        if clean_mime == "image/png" or (not clean_mime and filename.lower().endswith(".png")):
+            effective_mime = "image/png"
+            ext = ".png"
+        elif clean_mime in ("image/jpeg", "image/jpg") or (not clean_mime and filename.lower().endswith((".jpg", ".jpeg"))):
+            effective_mime = "image/jpeg"
+            ext = ".jpg"
+        else:
+            raise ValueError(f"Unsupported MIME type {mime_type!r}; only image/jpeg and image/png are accepted.")
+
+        size_limit = self._settings.bill_size_limit_bytes
+        if len(image_bytes) > size_limit:
+            raise ValueError(
+                f"File size {len(image_bytes)} bytes exceeds limit {size_limit} bytes "
+                f"({self._settings.bill_size_limit_mb} MiB)."
+            )
+
+        bill_id = f"wamid.WEB_{uuid.uuid4().hex[:12]}"
+        saved_filename = f"{bill_id}{ext}"
+        media_dir = Path(__file__).resolve().parent.parent.parent / "media"
+        media_dir.mkdir(parents=True, exist_ok=True)
+        media_path = media_dir / saved_filename
+        with open(media_path, "wb") as fh:
+            fh.write(image_bytes)
+
+        bill = Bill(
+            bill_id=bill_id,
+            sender=sender,
+            media_id=f"local:{saved_filename}",
+            mime_type=effective_mime,
+            received_at=datetime.now(_UTC),
+            status=BillStatus.QUEUED,
+        )
+        self._store.insert_bill(bill)
+        logger.info("Inserted web-uploaded bill bill_id=%r (%d bytes)", bill_id, len(image_bytes))
+        return bill_id
+
     # ------------------------------------------------------------------
     # Pipeline 2: AI Scan Worker
     # ------------------------------------------------------------------
@@ -310,8 +364,19 @@ class WorkflowEngine:
         logger.info("Scanning bill_id=%r scan_id=%r", bill_id, scan_id)
 
         try:
-            # ── Download media ─────────────────────────────────────────
-            image_bytes, downloaded_mime = await self._whatsapp.download_media(bill.media_id)
+            # ── Download or load media ─────────────────────────────────
+            image_bytes = None
+            downloaded_mime = bill.mime_type or "image/jpeg"
+            if bill.media_id and bill.media_id.startswith("local:"):
+                fname = bill.media_id.split("local:", 1)[1]
+                media_dir = Path(__file__).resolve().parent.parent.parent / "media"
+                local_f = media_dir / fname
+                if local_f.exists():
+                    image_bytes = local_f.read_bytes()
+                    downloaded_mime = bill.mime_type or ("image/png" if fname.endswith(".png") else "image/jpeg")
+
+            if image_bytes is None:
+                image_bytes, downloaded_mime = await self._whatsapp.download_media(bill.media_id)
 
             # ── Validate MIME type ─────────────────────────────────────
             # Use the mime_type from the original intake event (more reliable)
