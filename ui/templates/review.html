@@ -1321,10 +1321,19 @@
                     <span style="color: var(--text-dim);">-</span>
                   {% endif %}
                 </td>
-                <td style="text-align: center; white-space: nowrap;">
-                  <a href="/ui/bills/{{ b.bill_id }}" class="btn-action {% if b.status.value == 'REVIEW' %}btn-action-highlight{% endif %}">
-                    Review Bill &rarr;
-                  </a>
+                <td style="text-align: right; white-space: nowrap;">
+                  <div style="display:inline-flex; align-items:center; gap:6px;">
+                    {% if b.status.value == 'REVIEW' %}
+                    <form action="/ui/bills/{{ b.bill_id }}/quick-approve" method="POST" style="margin:0;">
+                      <button type="submit" class="btn btn-secondary" title="Quick-approve bill and auto-post to ledger" style="font-size:11.5px; padding:4px 8px; color:#059669; border-color:#a7f3d0; background:#ecfdf5; font-weight:600; display:inline-flex; align-items:center; gap:3px;">
+                        ⚡ Quick Approve
+                      </button>
+                    </form>
+                    {% endif %}
+                    <a href="/ui/bills/{{ b.bill_id }}" class="btn-action {% if b.status.value == 'REVIEW' %}btn-action-highlight{% endif %}">
+                      Review &rarr;
+                    </a>
+                  </div>
                 </td>
               </tr>
               {% else %}

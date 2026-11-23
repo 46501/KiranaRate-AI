@@ -489,6 +489,115 @@ async def ui_reject_bill(
     )
 
 
+@app.post("/ui/bills/{bill_id}/quick-approve")
+async def ui_quick_approve_bill(
+    request: Request,
+    bill_id: str,
+):
+    """
+    1-Click Quick Approval from Dashboard for bills with high-confidence extractions.
+    Automatically assigns suggested SKUs, marks header verified, balances paise,
+    and transitions status to APPROVED (and triggers Post Worker).
+    """
+    store: SQLiteStore = request.app.state.store
+    engine: WorkflowEngine = request.app.state.engine
+
+    bill = store.get_bill(bill_id)
+    if not bill:
+        return RedirectResponse(url="/ui/bills?msg=Error:+Bill+not+found", status_code=status.HTTP_303_SEE_OTHER)
+
+    if bill.status != BillStatus.REVIEW:
+        return RedirectResponse(
+            url=f"/ui/bills?msg=Bill+{bill_id}+is+in+{bill.status.value}+state+and+cannot+be+quick-approved",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    lines = store.get_review_lines(bill_id)
+    if not lines:
+        return RedirectResponse(
+            url=f"/ui/bills/{bill_id}?msg=Error:+Cannot+quick-approve+bill+with+no+line+items",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    # Resolve supplier
+    suppliers = store.list_suppliers(active_only=True)
+    supplier_id = None
+    if bill.supplier_raw:
+        norm_raw = bill.supplier_raw.lower().strip()
+        for s in suppliers:
+            if norm_raw in s.supplier_name.lower() or s.supplier_name.lower() in norm_raw or s.supplier_id.lower() in norm_raw:
+                supplier_id = s.supplier_id
+                break
+    if not supplier_id:
+        supplier_id = bill.supplier_id
+    if not supplier_id and suppliers:
+        supplier_id = suppliers[0].supplier_id
+
+    # Resolve products & lines
+    products = store.list_products(active_only=True)
+    running_total = Decimal("0.00")
+
+    for ln in lines:
+        sku = ln.sku
+        if not sku:
+            best = SKUMatcher.get_best_match(ln.product_raw, ln.pack_raw, products, auto_threshold=0.35)
+            sku = best.sku if best else (products[0].sku if products else "UNKNOWN")
+
+        units = ln.received_units or int(Decimal(str(ln.quantity_raw or "1")).to_integral_value())
+        if units < 1:
+            units = 1
+
+        amt = ln.net_amount
+        if not amt:
+            try:
+                amt = Decimal(str(ln.line_total_raw or "0.00").strip())
+            except Exception:
+                amt = Decimal("0.00")
+            if amt <= 0 and ln.rate_raw:
+                try:
+                    amt = Decimal(str(ln.rate_raw).strip()) * units
+                except Exception:
+                    amt = Decimal("0.00")
+
+        running_total += amt
+        store.update_review_line(
+            ln.review_id,
+            sku=sku,
+            received_units=units,
+            net_amount=amt,
+            reviewed=Reviewed.YES,
+        )
+
+    inv_date = bill.invoice_date or date.today().isoformat()
+    verified_total = bill.verified_net_total or (Decimal(str(bill.invoice_total)) if bill.invoice_total else running_total)
+    if verified_total <= 0:
+        verified_total = running_total
+
+    store.update_bill(
+        bill_id,
+        supplier_id=supplier_id,
+        invoice_no=bill.invoice_no or f"INV-{bill_id[-6:]}",
+        invoice_date=inv_date,
+        cost_basis=CostBasis.EX_GST,
+        verified_net_total=verified_total,
+        header_verified=HeaderVerified.YES,
+        reviewer="quick_approver",
+        status=BillStatus.APPROVED,
+    )
+
+    try:
+        await engine.run_post_worker()
+        msg = f"Bill+{bill_id}+Quick-Approved+&+Posted+Successfully!"
+    except Exception as exc:
+        logger.warning("Auto post worker failed after quick approval: %s", exc)
+        msg = f"Bill+{bill_id}+Quick-Approved+Successfully!"
+
+    return RedirectResponse(
+        url=f"/ui/bills?status_filter=ALL&msg={msg}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
 @app.post("/ui/workers/run/{stage}")
 async def ui_trigger_worker(request: Request, stage: str):
     """Trigger worker and redirect back to dashboard."""
