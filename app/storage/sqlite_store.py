@@ -986,6 +986,13 @@ class SQLiteStore(BaseStore):
         )
         return [_row_to_alert(row) for row in cur.fetchall()]
 
+    def get_alert(self, alert_id: str) -> Optional[Alert]:
+        """Return Alert by its alert_id, or None if not found."""
+        conn = self._get_conn()
+        cur = conn.execute("SELECT * FROM alerts WHERE alert_id = ?", (alert_id,))
+        row = cur.fetchone()
+        return _row_to_alert(row) if row else None
+
     def update_alert(self, alert_id: str, **fields) -> None:
         sql, params = self._build_update_sql(
             "alerts", "alert_id", self._ALERT_FIELDS, fields

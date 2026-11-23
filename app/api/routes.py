@@ -27,6 +27,7 @@ from app.schemas import (
     ReviewLineResponse,
 )
 from app.services.accounting_export import AccountingExporter
+from app.services.negotiation_generator import NegotiationGenerator
 from app.services.sku_matcher import SKUMatcher
 from app.services.tax_engine import TaxEngine
 from app.services.workflow_engine import WorkflowEngine
@@ -615,6 +616,42 @@ async def get_gst_itc_report(
             for s in report.by_supplier
         ],
     }
+
+
+# ---------------------------------------------------------------------------
+# Supplier WhatsApp Negotiation Notes
+# ---------------------------------------------------------------------------
+
+@router.get("/alerts/{alert_id}/negotiation-note")
+async def get_negotiation_note(
+    alert_id: str,
+    store: BaseStore = Depends(get_store),
+) -> dict:
+    """
+    Generate professional English and Hinglish rate negotiation notes with WhatsApp deep-links.
+    """
+    alert = store.get_alert(alert_id)
+    if not alert:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Alert '{alert_id}' not found")
+
+    note = NegotiationGenerator.generate_note(alert, store)
+    return {
+        "alert_id": note.alert_id,
+        "sku": note.sku,
+        "product_name": note.product_name,
+        "high_supplier": note.high_supplier,
+        "low_supplier": note.low_supplier,
+        "high_rate_inr": note.high_rate_inr,
+        "low_rate_inr": note.low_rate_inr,
+        "gap_diff_inr": note.gap_diff_inr,
+        "gap_pct": note.gap_pct,
+        "high_date": note.high_date,
+        "english_message": note.english_message,
+        "hinglish_message": note.hinglish_message,
+        "whatsapp_url_en": note.whatsapp_url_en,
+        "whatsapp_url_hi": note.whatsapp_url_hi,
+    }
+
 
 
 

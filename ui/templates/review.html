@@ -1455,6 +1455,7 @@
                 <th>Price Gap (%)</th>
                 <th>Status</th>
                 <th>Dispatched WAMID</th>
+                <th style="text-align: right;">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -1477,10 +1478,18 @@
                 <td style="font-family:var(--font-mono); font-size:12px; color:var(--text-muted);">
                   {{ a.wamid or '-' }}
                 </td>
+                <td style="text-align: right; white-space: nowrap;">
+                  <button type="button" class="btn btn-secondary" onclick="openNegotiationModal('{{ a.alert_id }}')" style="font-size:11.5px; padding:4px 9px; color:#16a34a; border-color:#86efac; background:#f0fdf4; display:inline-flex; align-items:center; gap:4px; font-weight:600;">
+                    <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12.031 2C6.496 2 2 6.496 2 12.031c0 1.953.563 3.773 1.531 5.313L2 22l4.828-1.5a10.015 10.015 0 005.203 1.531c5.535 0 10.031-4.496 10.031-10.031S17.566 2 12.031 2z"></path>
+                    </svg>
+                    Negotiate
+                  </button>
+                </td>
               </tr>
               {% else %}
               <tr>
-                <td colspan="8">
+                <td colspan="9">
                   <div class="empty-state-box">
                     <div class="empty-title">No price-gap alerts triggered yet</div>
                     <div class="empty-desc">
@@ -1852,8 +1861,130 @@
     </div>
   </div>
 
+  <!-- WHATSAPP SUPPLIER NEGOTIATION MODAL -->
+  <div id="negotiationModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:9999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(2px);">
+    <div style="background:#ffffff; border-radius:14px; max-width:540px; width:100%; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); border:1px solid var(--border); overflow:hidden;">
+      <div style="padding:18px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <span style="font-size:11px; font-weight:700; color:#16a34a; text-transform:uppercase;">Rate Arbitrage Action</span>
+          <h3 style="margin:2px 0 0 0; font-size:16px; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:6px;">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24" style="color:#16a34a;">
+              <path d="M12.031 2C6.496 2 2 6.496 2 12.031c0 1.953.563 3.773 1.531 5.313L2 22l4.828-1.5a10.015 10.015 0 005.203 1.531c5.535 0 10.031-4.496 10.031-10.031S17.566 2 12.031 2z"></path>
+            </svg>
+            WhatsApp Rate Negotiation Note
+          </h3>
+        </div>
+        <button type="button" onclick="closeNegotiationModal()" style="background:transparent; border:none; font-size:18px; color:var(--text-muted); cursor:pointer;">✕</button>
+      </div>
+
+      <div style="padding:20px 24px;">
+        <div style="background:#f8fafc; border:1px solid #eaecf0; border-radius:8px; padding:12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:11px; color:var(--text-muted);">Supplier to Negotiate:</div>
+            <strong id="negHighSupplier" style="font-size:14px; color:var(--text-main);">-</strong>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px; color:var(--text-muted);">Target Match Rate:</div>
+            <strong id="negTargetRate" style="font-size:14px; color:#059669; font-family:var(--font-mono);">-</strong>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <button type="button" id="tabEn" class="btn btn-secondary" onclick="switchNegLang('en')" style="font-size:12px; padding:4px 10px; background:#eff6ff; color:var(--primary); font-weight:600; border-color:var(--primary-border);">
+            Professional English
+          </button>
+          <button type="button" id="tabHi" class="btn btn-secondary" onclick="switchNegLang('hi')" style="font-size:12px; padding:4px 10px; color:var(--text-muted);">
+            Retail Hinglish
+          </button>
+        </div>
+
+        <textarea id="negTextarea" rows="7" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:10px; font-size:12px; font-family:var(--font-sans); color:var(--text-main); line-height:1.5; resize:none;"></textarea>
+
+        <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <button type="button" class="btn btn-secondary" onclick="copyNegotiationText()" id="copyNegBtn" style="font-size:12px; padding:7px 12px; display:inline-flex; align-items:center; gap:5px;">
+            📋 Copy Note
+          </button>
+          <a id="sendWhatsAppLink" href="#" target="_blank" class="btn btn-success" style="font-size:12.5px; padding:7px 16px; display:inline-flex; align-items:center; gap:6px;">
+            <svg width="15" height="15" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12.031 2C6.496 2 2 6.496 2 12.031c0 1.953.563 3.773 1.531 5.313L2 22l4.828-1.5a10.015 10.015 0 005.203 1.531c5.535 0 10.031-4.496 10.031-10.031S17.566 2 12.031 2z"></path>
+            </svg>
+            Send on WhatsApp &rarr;
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- INSTANT CLIENT-SIDE SEARCH & MODAL SCRIPT -->
   <script>
+    let currentNegData = null;
+
+    async function openNegotiationModal(alertId) {
+      const modal = document.getElementById('negotiationModal');
+      modal.style.display = 'flex';
+
+      try {
+        const resp = await fetch('/alerts/' + encodeURIComponent(alertId) + '/negotiation-note');
+        if (!resp.ok) return;
+        currentNegData = await resp.json();
+
+        document.getElementById('negHighSupplier').textContent = currentNegData.high_supplier;
+        document.getElementById('negTargetRate').textContent = '₹' + currentNegData.low_rate_inr.toFixed(2) + ' / unit';
+        switchNegLang('en');
+      } catch (err) {
+        console.error('Failed to load negotiation note:', err);
+      }
+    }
+
+    function closeNegotiationModal() {
+      const modal = document.getElementById('negotiationModal');
+      if (modal) modal.style.display = 'none';
+      currentNegData = null;
+    }
+
+    function switchNegLang(lang) {
+      if (!currentNegData) return;
+      const tabEn = document.getElementById('tabEn');
+      const tabHi = document.getElementById('tabHi');
+      const textarea = document.getElementById('negTextarea');
+      const waLink = document.getElementById('sendWhatsAppLink');
+
+      if (lang === 'en') {
+        tabEn.style.background = '#eff6ff';
+        tabEn.style.color = 'var(--primary)';
+        tabEn.style.fontWeight = '600';
+        tabEn.style.borderColor = 'var(--primary-border)';
+        tabHi.style.background = '#ffffff';
+        tabHi.style.color = 'var(--text-muted)';
+        tabHi.style.fontWeight = 'normal';
+        tabHi.style.borderColor = '#eaecf0';
+
+        textarea.value = currentNegData.english_message;
+        waLink.href = currentNegData.whatsapp_url_en;
+      } else {
+        tabHi.style.background = '#eff6ff';
+        tabHi.style.color = 'var(--primary)';
+        tabHi.style.fontWeight = '600';
+        tabHi.style.borderColor = 'var(--primary-border)';
+        tabEn.style.background = '#ffffff';
+        tabEn.style.color = 'var(--text-muted)';
+        tabEn.style.fontWeight = 'normal';
+        tabEn.style.borderColor = '#eaecf0';
+
+        textarea.value = currentNegData.hinglish_message;
+        waLink.href = currentNegData.whatsapp_url_hi;
+      }
+    }
+
+    function copyNegotiationText() {
+      const textarea = document.getElementById('negTextarea');
+      textarea.select();
+      navigator.clipboard.writeText(textarea.value);
+      const btn = document.getElementById('copyNegBtn');
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = '📋 Copy Note'; }, 2000);
+    }
+
     let priceChartInstance = null;
 
     async function openPriceChart(sku, productName) {

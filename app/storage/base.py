@@ -257,6 +257,10 @@ class BaseStore(ABC):
         """Return all alerts ordered by creation date descending (up to limit)."""
         return []
 
+    def get_alert(self, alert_id: str) -> Optional[Alert]:
+        """Return Alert by its alert_id, or None if not found."""
+        return None
+
     @abstractmethod
     def update_alert(self, alert_id: str, **fields) -> None:
         """
