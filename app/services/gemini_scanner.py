@@ -207,10 +207,43 @@ class GeminiScanner:
         except asyncio.TimeoutError as exc:
             logger.error("Gemini Vision API timed out after %ds", self.request_timeout)
             raise TimeoutError(f"Gemini API timed out after {self.request_timeout}s.") from exc
+        except Exception as exc:
+            logger.error("Gemini Vision API call failed: %s", exc)
+            raise
 
-        logger.debug("Gemini raw response text: %s", response.text[:500])
+        raw_text = ""
+        try:
+            if hasattr(response, "text") and response.text:
+                raw_text = response.text.strip()
+            elif hasattr(response, "candidates") and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, "content") and candidate.content and candidate.content.parts:
+                    raw_text = "".join(
+                        part.text for part in candidate.content.parts if hasattr(part, "text") and part.text
+                    ).strip()
+        except Exception as exc:
+            logger.warning("Error accessing response.text from Gemini response: %s", exc)
 
-        raw: dict[str, Any] = json.loads(response.text)
+        if not raw_text:
+            raise ValueError("Gemini returned empty response text or content was blocked by safety filters.")
+
+        # Strip markdown code fences if model returned them
+        if raw_text.startswith("```"):
+            fence_lines = raw_text.splitlines()
+            if fence_lines[0].startswith("```"):
+                fence_lines = fence_lines[1:]
+            if fence_lines and fence_lines[-1].startswith("```"):
+                fence_lines = fence_lines[:-1]
+            raw_text = "\n".join(fence_lines).strip()
+
+        logger.debug("Gemini sanitized response text: %s", raw_text[:500])
+
+        try:
+            raw: dict[str, Any] = json.loads(raw_text)
+        except json.JSONDecodeError as exc:
+            logger.error("Failed to parse Gemini output as JSON: %r", raw_text[:300])
+            raise json.JSONDecodeError(f"Failed to parse Gemini output as JSON: {exc}", raw_text, exc.pos) from exc
+
         return self._validate_and_normalize(raw)
 
     # ------------------------------------------------------------------

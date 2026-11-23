@@ -193,7 +193,8 @@ The automated test suite provides 100% offline coverage with deterministic mocks
 pytest tests -v
 ```
 
-### Coverage Highlights (76 Tests):
+### Coverage Highlights (79 Tests):
+- **Real-Flow E2E Tests (`tests/test_real_flow_e2e.py`):** Full cycle from WhatsApp webhook POST -> QUEUED -> scan -> REVIEW -> human approval -> POSTED -> rate comparison -> WhatsApp template outbox dispatch (including wamid tracking and network failure / timeout status freezing).
 - **Intake Tests (`tests/test_intake.py`):** Challenge verification, allowlist filtering, phone number ID checking, media type enforcement, idempotency/deduplication.
 - **Scan Tests (`tests/test_scan.py`):** Gemini JSON extraction, 1..75 line constraints, error handling, note flag preservation.
 - **Posting Tests (`tests/test_post.py`):** 15 validation checks, Indian FY invoice duplicate prevention, paise sum reconciliation, SKU/unit validation.
@@ -234,4 +235,79 @@ To connect live Meta WhatsApp Cloud API and Google Gemini Vision:
      WHATSAPP_ALLOWLIST=919876543210,919123456789
      ```
    - In Meta Business Manager, create and submit the `purchase_rate_review` template with 10 body variables. Once approved, live alerts will be delivered directly to the store owner's WhatsApp number.
+
+---
+
+## 9. Live End-to-End Test Runbook (Testing 1 Real Bill Safely)
+
+Follow this step-by-step checklist to test the entire live loop with 1 real supplier bill without risking data corruption:
+
+### Step 1: Pre-Flight Configuration (`.env` Checklist)
+Ensure your `.env` contains:
+- `MOCK_GEMINI=false` and a valid `GEMINI_API_KEY=AIza...`
+- `MOCK_WHATSAPP=false`
+- `WHATSAPP_ACCESS_TOKEN=...` (System user token with `whatsapp_business_messaging` permission)
+- `WHATSAPP_PHONE_NUMBER_ID=...` (Your Meta WhatsApp Business Account phone number ID)
+- `WHATSAPP_OWNER_NUMBER=91XXXXXXXXXX` (The store owner phone number where alerts should arrive)
+- `WHATSAPP_ALLOWLIST=91YYYYYYYYYY` (Your testing mobile number sending the bill receipt)
+- `WHATSAPP_VERIFY_TOKEN=kirana_iq_secret_2026`
+
+### Step 2: Run Live Connectivity Probe
+Before starting the server, run:
+```bash
+python scripts/live_smoke.py --live
+```
+Verify that both **Google Gemini Vision Live** and **Meta WhatsApp Cloud API Live** report `READY (PASS)`.
+
+### Step 3: Start FastAPI Server & Public Webhook Tunnel
+In Terminal 1 (start FastAPI):
+```bash
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+In Terminal 2 (start ngrok tunnel):
+```bash
+ngrok http 8000
+```
+Copy the Forwarding URL (e.g. `https://xyz-abc.ngrok-free.app`).
+
+### Step 4: Configure Meta Webhook
+1. Go to **Meta App Dashboard > WhatsApp > Configuration**.
+2. Click **Edit** under Callback URL.
+3. Set **Callback URL**: `https://xyz-abc.ngrok-free.app/webhook/whatsapp`.
+4. Set **Verify Token**: `kirana_iq_secret_2026` (matching your `.env`).
+5. Click **Verify and Save**. Meta will execute a GET handshake which returns HTTP 200 with the challenge.
+6. Under **Webhook fields**, click **Subscribe** to `messages`.
+
+### Step 5: Send 1 Real Bill Photo via WhatsApp
+1. From your allowlisted mobile phone, take a clear photo of an FMCG bill receipt (or send a photo of a test invoice).
+2. Send the photo to your WhatsApp Business phone number.
+3. Check the server terminal: you will see `Parsed BillIntakeEvent` and `Inserted QUEUED bill`.
+4. Open the browser dashboard: [http://127.0.0.1:8000/ui/bills](http://127.0.0.1:8000/ui/bills).
+5. The bill will appear in the bills table with status **QUEUED**.
+
+### Step 6: Trigger AI Scan Worker
+Click **▶ Run Scan Worker** on the dashboard (or wait 15 seconds if `ENABLE_BACKGROUND_WORKERS=true`).
+- Gemini Vision will analyze the receipt image, extract supplier name, invoice date, total, and individual line items.
+- The bill status will transition from `QUEUED` to **`REVIEW`**.
+
+### Step 7: Inspect, Map SKUs & Approve in KiranaIQ UI
+1. Click **Review →** next to the bill.
+2. Inspect the original receipt image on the left side (with Zoom controls).
+3. On the right side, verify the supplier, invoice number, and date.
+4. For each line item, select the canonical SKU from master products (or click **Apply Suggestion**).
+5. If bonus/free items were included, adjust the received units.
+6. Verify the live financial reconciliation badge shows green (`✓ Line amounts match verified net total`).
+7. Click **✓ Save & Approve Bill**. The bill transitions to **`APPROVED`**.
+
+### Step 8: Trigger Verify, Post & Rate Comparison Worker
+Click **▶ Run Post Worker** (or wait 15s).
+- The system executes all 15 business rule validations and posts the purchases into the SQLite ledger per SKU (`net_paise // units`).
+- If this rate is $\ge 2.00\%$ and $\ge 1$ paisa higher than the cheapest rate in the last 30 days, KiranaIQ generates a **`PENDING` Alert**.
+- The bill status transitions to **`POSTED`**.
+
+### Step 9: Trigger WhatsApp Outbox Worker & Receive Alert
+Click **▶ Run Alert Outbox** (or wait 30s).
+- The alert worker transitions the alert to `SENDING`, populates the 10 parameters in the `purchase_rate_review` template, and dispatches it through Meta Cloud API.
+- The store owner receives the WhatsApp price discrepancy alert instantly on their phone.
+- The alert transitions to **`SENT`** with the returned `wamid`.
 

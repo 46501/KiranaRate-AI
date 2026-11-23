@@ -67,9 +67,15 @@ async def lifespan(app: FastAPI):
     store.create_tables()
     store.seed_demo_data()
 
+    def _is_placeholder(val: str | None) -> bool:
+        if not val:
+            return True
+        s = str(val).strip().lower()
+        return s.startswith("your_") or s in ("changeme", "none", "placeholder", "")
+
     # WhatsApp adapter initialization
-    if cfg.mock_whatsapp or not cfg.whatsapp_access_token:
-        logger.info("Using MockWhatsAppClient (MOCK_WHATSAPP=true or token unset)")
+    if cfg.mock_whatsapp or _is_placeholder(cfg.whatsapp_access_token):
+        logger.info("Using MockWhatsAppClient (MOCK_WHATSAPP=true or token unset/placeholder)")
         whatsapp = MockWhatsAppClient(
             template_name=cfg.whatsapp_template_name,
             template_lang=cfg.whatsapp_template_lang,
@@ -85,8 +91,8 @@ async def lifespan(app: FastAPI):
         )
 
     # Gemini scanner initialization
-    if cfg.mock_gemini or not cfg.gemini_api_key:
-        logger.info("Using MockGeminiScanner (MOCK_GEMINI=true or key unset)")
+    if cfg.mock_gemini or _is_placeholder(cfg.gemini_api_key):
+        logger.info("Using MockGeminiScanner (MOCK_GEMINI=true or key unset/placeholder)")
         scanner = MockGeminiScanner()
     else:
         scanner = GeminiScanner(

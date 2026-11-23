@@ -278,6 +278,13 @@ async def run_offline_simulation() -> bool:
     return True
 
 
+def _is_placeholder(val: str | None) -> bool:
+    if not val:
+        return True
+    s = str(val).strip().lower()
+    return s.startswith("your_") or s in ("changeme", "none", "placeholder", "")
+
+
 async def run_live_connectivity_probe() -> bool:
     """
     Probe real credentials configured in .env for live external readiness:
@@ -294,7 +301,7 @@ async def run_live_connectivity_probe() -> bool:
 
     # ── 1. Check Gemini API ─────────────────────────────────────
     print("\n[1/3] Checking Google Gemini Vision Configuration...")
-    if not cfg.gemini_api_key or cfg.gemini_api_key == "your_gemini_api_key_here":
+    if _is_placeholder(cfg.gemini_api_key):
         print("  ⚠️  GEMINI_API_KEY is not configured or using placeholder.")
         print("     To activate live scanning, get an API key at https://aistudio.google.com/")
         print("     and set GEMINI_API_KEY=AIza... in .env (MOCK_GEMINI=false).")
@@ -321,7 +328,7 @@ async def run_live_connectivity_probe() -> bool:
     wa_token = cfg.whatsapp_access_token
     phone_id = cfg.whatsapp_phone_number_id
 
-    if not wa_token or wa_token == "your_access_token_here" or not phone_id or phone_id == "your_phone_number_id_here":
+    if _is_placeholder(wa_token) or _is_placeholder(phone_id):
         print("  ⚠️  WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID not configured.")
         print("     To activate live WhatsApp messaging, get a System User Token and Phone Number ID")
         print("     from Meta for Developers (https://developers.facebook.com/) and set them in .env.")
