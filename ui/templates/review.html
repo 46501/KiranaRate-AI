@@ -1054,18 +1054,18 @@
           <span>+ Upload Bill</span>
         </button>
 
-        <!-- Worker Controls -->
-        <form action="/ui/workers/run/scan" method="POST" style="margin:0;">
+        <!-- Worker Controls with instant loading feedback -->
+        <form action="/ui/workers/run/scan" method="POST" style="margin:0;" onsubmit="var b=this.querySelector('button'); b.disabled=true; b.innerHTML='⏳ Scanning...';">
           <button type="submit" class="btn btn-worker" title="Scan oldest queued bill with Gemini Vision">
             ▶ Run Scan Worker
           </button>
         </form>
-        <form action="/ui/workers/run/post" method="POST" style="margin:0;">
+        <form action="/ui/workers/run/post" method="POST" style="margin:0;" onsubmit="var b=this.querySelector('button'); b.disabled=true; b.innerHTML='⏳ Posting...';">
           <button type="submit" class="btn btn-worker" title="Post oldest approved bill & run rate comparison">
             ▶ Run Post Worker
           </button>
         </form>
-        <form action="/ui/workers/run/alert" method="POST" style="margin:0;">
+        <form action="/ui/workers/run/alert" method="POST" style="margin:0;" onsubmit="var b=this.querySelector('button'); b.disabled=true; b.innerHTML='⏳ Dispatching...';">
           <button type="submit" class="btn btn-worker" title="Dispatch oldest pending alert via WhatsApp">
             ▶ Run Alert Outbox
           </button>

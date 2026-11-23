@@ -704,6 +704,7 @@
         <div class="heading-row" style="margin-top: 4px;">
           <h1>Bill Review</h1>
           <span class="bill-id-tag">{{ bill.bill_id }}</span>
+          <span style="font-size:11px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:2px 8px; border-radius:12px; font-weight:600; font-family:var(--font-mono);">Single Store Pilot · INR · EX_GST</span>
         </div>
         <div class="meta-bar">
           <span class="meta-item">
@@ -979,17 +980,21 @@
                     </span>
                     {% endif %}
                   </div>
-                  <select name="sku_{{ ln.review_id }}" required>
+                  <select name="sku_{{ ln.review_id }}" id="sku_select_{{ ln.review_id }}" required>
                     <option value="">-- Select Canonical SKU --</option>
                     {% for p in products %}
-                    <option value="{{ p.sku }}" {% if ln.sku == p.sku or (not ln.sku and suggestions and suggestions.get(ln.review_id) and suggestions[ln.review_id].sku == p.sku and suggestions[ln.review_id].confidence >= 65) %}selected{% endif %}>
+                    <option value="{{ p.sku }}" {% if ln.sku == p.sku %}selected{% endif %}>
                       {{ p.sku }} ({{ p.product_name }})
                     </option>
                     {% endfor %}
                   </select>
                   {% if suggestions and suggestions.get(ln.review_id) and not ln.sku %}
-                  <div style="font-size:11px; color:var(--text-muted); margin-top:3px;">
-                    Suggested: <strong>{{ suggestions[ln.review_id].sku }}</strong> ({{ suggestions[ln.review_id].product_name }})
+                  {% set sug = suggestions[ln.review_id] %}
+                  <div style="font-size:11.5px; color:var(--text-muted); margin-top:5px; display:flex; align-items:center; justify-content:space-between; gap:6px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:4px 8px;">
+                    <span>AI Suggestion: <strong>{{ sug.sku }}</strong> ({{ sug.confidence }}% match)</span>
+                    <button type="button" onclick="document.getElementById('sku_select_{{ ln.review_id }}').value='{{ sug.sku }}'; this.parentElement.style.display='none'; updateReconciliation();" style="background:#2563eb; color:#fff; border:none; padding:2px 8px; border-radius:4px; font-size:10.5px; font-weight:600; cursor:pointer;">
+                      Apply Suggestion
+                    </button>
                   </div>
                   {% endif %}
                 </div>
@@ -1033,16 +1038,19 @@
                 <span class="recon-lbl">Verified Total</span>
                 <span class="recon-val" id="verifiedTotalDisplay">₹{{ bill.verified_net_total or bill.invoice_total or '0.00' }}</span>
               </div>
-              <div>
+              <div style="display:flex; align-items:center; gap:8px;">
                 <span class="recon-pill recon-ok" id="reconBadge">
                   ● Live Reconciliation Active
                 </span>
+                <button type="button" id="btnAutoBalance" onclick="autoBalancePaise()" style="display:none; font-size:11.5px; padding:4px 9px; background:#eff6ff; border:1px solid #bfdbfe; color:#2563eb; border-radius:6px; cursor:pointer; font-weight:600;">
+                  ⚡ Balance Paise
+                </button>
               </div>
             </div>
             {% endif %}
 
             <div style="margin-top: 18px;">
-              <button type="submit" class="btn btn-success btn-lg">
+              <button type="submit" class="btn btn-success btn-lg" id="btnApproveBill">
                 <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
                 </svg>
@@ -1116,12 +1124,35 @@
       verifiedTotalDisplay.textContent = '₹' + verified.toFixed(2);
 
       const diff = Math.abs(sum - verified);
+      const btnBalance = document.getElementById('btnAutoBalance');
       if (diff < 0.01) {
         reconBadge.className = 'recon-pill recon-ok';
         reconBadge.textContent = '✓ Line amounts match verified net total';
+        if (btnBalance) btnBalance.style.display = 'none';
       } else {
         reconBadge.className = 'recon-pill recon-diff';
         reconBadge.textContent = '⚠ Variance: ₹' + (sum - verified).toFixed(2);
+        if (btnBalance && Math.abs(sum - verified) <= 2.00) {
+          btnBalance.style.display = 'inline-block';
+        } else if (btnBalance) {
+          btnBalance.style.display = 'none';
+        }
+      }
+    }
+
+    function autoBalancePaise() {
+      const netTotalInput = document.getElementById('verifiedNetTotal');
+      const amtInputs = document.querySelectorAll('.line-amt');
+      if (!netTotalInput || amtInputs.length === 0) return;
+      let sum = 0;
+      amtInputs.forEach(input => { sum += parseFloat(input.value) || 0; });
+      const verified = parseFloat(netTotalInput.value) || 0;
+      const diff = verified - sum;
+      if (Math.abs(diff) > 0.0001 && Math.abs(diff) <= 2.00) {
+        const lastInput = amtInputs[amtInputs.length - 1];
+        const lastVal = parseFloat(lastInput.value) || 0;
+        lastInput.value = (lastVal + diff).toFixed(2);
+        updateReconciliation();
       }
     }
 
@@ -1132,6 +1163,18 @@
     const netTotalInput = document.getElementById('verifiedNetTotal');
     if (netTotalInput) {
       netTotalInput.addEventListener('input', updateReconciliation);
+    }
+
+    // Submit loading feedback
+    const approvalForm = document.getElementById('approvalForm');
+    if (approvalForm) {
+      approvalForm.addEventListener('submit', function() {
+        const btn = document.getElementById('btnApproveBill');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '⏳ Saving & Approving Bill...';
+        }
+      });
     }
 
     // Run reconciliation on page load
