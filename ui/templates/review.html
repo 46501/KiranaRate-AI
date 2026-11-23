@@ -927,6 +927,7 @@
       font-size: 12.5px;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -1393,6 +1394,15 @@
                 <div style="font-size:13.5px; font-weight:700; color:#dc2626; font-family:var(--font-mono);">₹{{ "%.2f"|format(item.max_rate) }}</div>
               </div>
             </div>
+            <div style="margin-top:12px; padding-top:10px; border-top:1px dashed #eaecf0; display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11.5px; color:var(--text-muted);">{{ item.count }} purchase(s) recorded</span>
+              <button type="button" class="btn btn-secondary" onclick="openPriceChart('{{ item.sku }}', '{{ item.product_name|escape }}')" style="font-size:11.5px; padding:4px 10px; display:inline-flex; align-items:center; gap:5px;">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"></path>
+                </svg>
+                View Price Chart
+              </button>
+            </div>
           </div>
           {% endfor %}
         </div>
@@ -1648,8 +1658,167 @@
     </div>
   </div>
 
+  <!-- PRICE TREND CHART MODAL -->
+  <div id="chartModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.65); z-index:9999; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(2px);">
+    <div style="background:#ffffff; border-radius:14px; max-width:680px; width:100%; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); border:1px solid var(--border); overflow:hidden;">
+      <div style="padding:18px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <span id="chartSkuBadge" style="font-size:11px; font-weight:700; color:var(--primary); font-family:var(--font-mono); text-transform:uppercase;">SKU</span>
+          <h3 id="chartProductTitle" style="margin:2px 0 0 0; font-size:16px; font-weight:700; color:var(--text-main);">
+            Product Price History
+          </h3>
+        </div>
+        <button type="button" onclick="closeChartModal()" style="background:transparent; border:none; font-size:18px; color:var(--text-muted); cursor:pointer;">✕</button>
+      </div>
+
+      <div style="padding:20px 24px;">
+        <!-- STAT STRIP -->
+        <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:16px;" id="chartStatStrip">
+          <div style="background:#f8fafc; border:1px solid #eaecf0; border-radius:8px; padding:10px;">
+            <div style="font-size:11px; color:var(--text-muted);">Current Rate</div>
+            <div id="chartCurrentRate" style="font-size:15px; font-weight:700; color:var(--text-main); font-family:var(--font-mono); margin-top:2px;">-</div>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #eaecf0; border-radius:8px; padding:10px;">
+            <div style="font-size:11px; color:#059669;">Lowest Rate</div>
+            <div id="chartMinRate" style="font-size:15px; font-weight:700; color:#059669; font-family:var(--font-mono); margin-top:2px;">-</div>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #eaecf0; border-radius:8px; padding:10px;">
+            <div style="font-size:11px; color:#dc2626;">Highest Rate</div>
+            <div id="chartMaxRate" style="font-size:15px; font-weight:700; color:#dc2626; font-family:var(--font-mono); margin-top:2px;">-</div>
+          </div>
+          <div style="background:#f8fafc; border:1px solid #eaecf0; border-radius:8px; padding:10px;">
+            <div style="font-size:11px; color:var(--text-muted);">Volatility</div>
+            <div id="chartVolatility" style="font-size:15px; font-weight:700; color:var(--primary); font-family:var(--font-mono); margin-top:2px;">-</div>
+          </div>
+        </div>
+
+        <!-- CANVAS CHART -->
+        <div style="position:relative; height:240px; width:100%; border:1px solid #eaecf0; border-radius:8px; padding:10px; background:#ffffff;">
+          <canvas id="priceTrendCanvas"></canvas>
+        </div>
+
+        <!-- RECENT PURCHASES TABLE -->
+        <div style="margin-top:14px; max-height:140px; overflow-y:auto; border:1px solid #eaecf0; border-radius:8px;">
+          <table style="width:100%; font-size:12px; border-collapse:collapse;" id="chartHistoryTable">
+            <thead style="background:#f8fafc; color:var(--text-muted); position:sticky; top:0;">
+              <tr>
+                <th style="padding:6px 10px; text-align:left;">Invoice Date</th>
+                <th style="padding:6px 10px; text-align:left;">Supplier</th>
+                <th style="padding:6px 10px; text-align:right;">Rate (INR)</th>
+                <th style="padding:6px 10px; text-align:right;">Units</th>
+              </tr>
+            </thead>
+            <tbody id="chartHistoryBody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- INSTANT CLIENT-SIDE SEARCH & MODAL SCRIPT -->
   <script>
+    let priceChartInstance = null;
+
+    async function openPriceChart(sku, productName) {
+      const modal = document.getElementById('chartModal');
+      document.getElementById('chartSkuBadge').textContent = sku;
+      document.getElementById('chartProductTitle').textContent = productName || sku;
+      modal.style.display = 'flex';
+
+      try {
+        const resp = await fetch('/analytics/sku-history?sku=' + encodeURIComponent(sku));
+        if (!resp.ok) return;
+        const data = await resp.json();
+
+        document.getElementById('chartCurrentRate').textContent = data.current_rate_inr ? '₹' + data.current_rate_inr.toFixed(2) : '-';
+        document.getElementById('chartMinRate').textContent = data.min_rate_inr ? '₹' + data.min_rate_inr.toFixed(2) : '-';
+        document.getElementById('chartMaxRate').textContent = data.max_rate_inr ? '₹' + data.max_rate_inr.toFixed(2) : '-';
+        document.getElementById('chartVolatility').textContent = data.volatility_percent ? data.volatility_percent.toFixed(1) + '%' : '0.0%';
+
+        // Populate Table
+        const tbody = document.getElementById('chartHistoryBody');
+        tbody.innerHTML = '';
+        if (data.history && data.history.length > 0) {
+          data.history.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.style.borderBottom = '1px solid #f1f5f9';
+            tr.innerHTML = `
+              <td style="padding:6px 10px; font-family:var(--font-mono);">${item.invoice_date}</td>
+              <td style="padding:6px 10px; font-weight:600;">${item.supplier_name}</td>
+              <td style="padding:6px 10px; text-align:right; font-family:var(--font-mono); color:var(--primary); font-weight:600;">₹${item.rate_inr.toFixed(2)}</td>
+              <td style="padding:6px 10px; text-align:right; font-family:var(--font-mono);">${item.units}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        } else {
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:12px; color:#94a3b8;">No historical purchases found.</td></tr>';
+        }
+
+        // Render Chart.js
+        const canvas = document.getElementById('priceTrendCanvas');
+        if (priceChartInstance) {
+          priceChartInstance.destroy();
+        }
+
+        const labels = data.history.map(h => h.invoice_date + ' (' + h.supplier_name + ')');
+        const rates = data.history.map(h => h.rate_inr);
+
+        priceChartInstance = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Purchase Rate (₹/unit)',
+              data: rates,
+              borderColor: '#2563eb',
+              backgroundColor: 'rgba(37, 99, 235, 0.08)',
+              borderWidth: 2.5,
+              tension: 0.25,
+              fill: true,
+              pointBackgroundColor: '#2563eb',
+              pointRadius: 5,
+              pointHoverRadius: 7,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return ' Rate: ₹' + context.parsed.y.toFixed(2) + ' / unit';
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: false,
+                ticks: {
+                  callback: function(val) { return '₹' + val; }
+                }
+              }
+            }
+          }
+        });
+
+      } catch (err) {
+        console.error('Failed to load price chart:', err);
+      }
+    }
+
+    function closeChartModal() {
+      const modal = document.getElementById('chartModal');
+      if (modal) modal.style.display = 'none';
+      if (priceChartInstance) {
+        priceChartInstance.destroy();
+        priceChartInstance = null;
+      }
+    }
+
     function openUploadModal() {
       const modal = document.getElementById('uploadModal');
       if (modal) {
