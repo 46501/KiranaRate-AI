@@ -30,6 +30,7 @@ from app.models import (
 )
 from app.services.gemini_scanner import GeminiScanner, MockGeminiScanner
 from app.services.sku_matcher import SKUMatcher
+from app.services.tax_engine import TaxEngine
 from app.services.whatsapp import MockWhatsAppClient, WhatsAppClient
 from app.services.workflow_engine import WorkflowEngine
 from app.storage.sqlite_store import SQLiteStore
@@ -294,6 +295,7 @@ async def ui_bills_dashboard(
             "products": products,
             "purchases": purchases,
             "sku_analytics": sku_analytics,
+            "gst_report": TaxEngine.compute_gst_report(store),
             "alerts": alerts,
             "current_view": view or "overview",
             "now_ist": now_ist,

@@ -28,6 +28,7 @@ from app.schemas import (
 )
 from app.services.accounting_export import AccountingExporter
 from app.services.sku_matcher import SKUMatcher
+from app.services.tax_engine import TaxEngine
 from app.services.workflow_engine import WorkflowEngine
 from app.storage.base import BaseStore
 
@@ -578,6 +579,43 @@ async def export_tally_xml(
         media_type="application/xml",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+
+# ---------------------------------------------------------------------------
+# GST & Input Tax Credit (ITC) Reconciliation
+# ---------------------------------------------------------------------------
+
+@router.get("/analytics/gst-itc")
+async def get_gst_itc_report(
+    store: BaseStore = Depends(get_store),
+) -> dict:
+    """
+    Compute GST tax breakdown, CGST/SGST split, and claimable Input Tax Credit (ITC).
+    """
+    report = TaxEngine.compute_gst_report(store)
+    return {
+        "total_taxable_inr": report.total_taxable_inr,
+        "total_cgst_inr": report.total_cgst_inr,
+        "total_sgst_inr": report.total_sgst_inr,
+        "total_itc_inr": report.total_itc_inr,
+        "total_gross_inr": report.total_gross_inr,
+        "by_slab": report.by_slab,
+        "by_supplier": [
+            {
+                "supplier_id": s.supplier_id,
+                "supplier_name": s.supplier_name,
+                "bills_count": s.bills_count,
+                "purchases_count": s.purchases_count,
+                "taxable_amount_inr": s.taxable_amount_inr,
+                "cgst_inr": s.cgst_inr,
+                "sgst_inr": s.sgst_inr,
+                "total_itc_inr": s.total_itc_inr,
+                "gross_amount_inr": s.gross_amount_inr,
+            }
+            for s in report.by_supplier
+        ],
+    }
+
 
 
 
