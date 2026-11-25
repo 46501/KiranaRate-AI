@@ -9,6 +9,7 @@ and registers both API and reviewer UI routes.
 from __future__ import annotations
 
 import hmac
+import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
@@ -20,6 +21,7 @@ from urllib.parse import quote
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.routes import router as api_router
@@ -31,6 +33,14 @@ from app.models import (
     Reviewed,
 )
 from app.services.auth import generate_csrf_token, hash_password, verify_csrf_token, verify_password
+from app.services.security import (
+    check_rate_limit,
+    get_client_ip,
+    login_tracker,
+    read_upload_file_safely,
+    sanitize_user_facing_error,
+    validate_image_magic_bytes,
+)
 from app.services.gemini_scanner import GeminiScanner, MockGeminiScanner
 from app.services.sku_matcher import SKUMatcher
 from app.services.tax_engine import TaxEngine
@@ -194,6 +204,40 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """
+    Attach standard HTTP security headers to all HTTP responses:
+    - X-Content-Type-Options: nosniff
+    - X-Frame-Options: DENY
+    - Referrer-Policy: strict-origin-when-cross-origin
+    - Content-Security-Policy (allows safe inline and CDN assets used by dashboard)
+    - X-XSS-Protection: 1; mode=block
+    - Permissions-Policy
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "font-src 'self' data: https://fonts.gstatic.com; "
+            "img-src 'self' data:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none';"
+        )
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+        return response
+
+
+# Security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
 # Secure session middleware for dashboard authentication & anti-fixation protection
 app.add_middleware(
     SessionMiddleware,
@@ -203,6 +247,25 @@ app.add_middleware(
     same_site="lax",
     https_only=settings.session_cookie_secure,
 )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Catch unhandled internal exceptions to sanitize error responses.
+    Prevents file paths, database identifiers, and stack traces from reaching clients.
+    """
+    logger.exception("Unhandled server exception on %s %s: %s", request.method, request.url.path, exc)
+    if request.url.path.startswith("/ui/"):
+        return RedirectResponse(
+            url="/ui/bills?msg=An+unexpected+internal+error+occurred",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    return Response(
+        content=json.dumps({"detail": "An internal server error occurred"}),
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        media_type="application/json",
+    )
 
 # Include JSON API routes
 app.include_router(api_router, tags=["API"])
@@ -251,7 +314,24 @@ def _get_or_create_csrf_token(request: Request) -> str:
 
 @app.get("/ui/login", response_class=HTMLResponse)
 async def ui_login_page(request: Request, next: Optional[str] = None):
-    """Render dashboard login form."""
+    """Render dashboard login form with rate limiting."""
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    try:
+        check_rate_limit(
+            request,
+            scope="login",
+            max_requests=cfg.rate_limit_login_per_minute * 2,
+            enabled=cfg.rate_limit_enabled,
+        )
+    except HTTPException as exc:
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={"csrf_token": "", "next_url": next, "error": exc.detail},
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": exc.headers.get("Retry-After", "60") if exc.headers else "60"},
+        )
+
     if _get_session_user(request):
         return RedirectResponse(url=next or "/ui/bills", status_code=status.HTTP_303_SEE_OTHER)
     csrf_token = _get_or_create_csrf_token(request)
@@ -270,8 +350,51 @@ async def ui_login_submit(
     csrf_token: str = Form(""),
     next: Optional[str] = Form(None),
 ):
-    """Process dashboard login credentials, prevent session fixation, and set cookie."""
+    """Process dashboard login credentials, enforce brute-force protection, and set cookie."""
     cfg: Settings = getattr(request.app.state, "settings", settings)
+    client_ip = get_client_ip(request)
+    lockout_key = f"{username.strip().lower()}:{client_ip}"
+
+    # 1. Enforce rate limiting on login endpoint
+    try:
+        check_rate_limit(
+            request,
+            scope="login",
+            max_requests=cfg.rate_limit_login_per_minute,
+            enabled=cfg.rate_limit_enabled,
+        )
+    except HTTPException as exc:
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "csrf_token": _get_or_create_csrf_token(request),
+                "next_url": next,
+                "error": exc.detail,
+                "username": username,
+            },
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": exc.headers.get("Retry-After", "60") if exc.headers else "60"},
+        )
+
+    # 2. Check account lockout from repeated failed attempts
+    is_locked, retry_after = login_tracker.is_locked(lockout_key)
+    if is_locked:
+        logger.warning("Rejected login attempt for locked account username=%r from %s", username, client_ip)
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "csrf_token": _get_or_create_csrf_token(request),
+                "next_url": next,
+                "error": f"Account temporarily locked due to repeated failed login attempts. Please retry in {retry_after} seconds.",
+                "username": username,
+            },
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    # 3. Anti-CSRF verification
     session_csrf = request.session.get("csrf_token") if hasattr(request, "session") else None
     if not verify_csrf_token(session_csrf, csrf_token):
         return templates.TemplateResponse(
@@ -286,24 +409,43 @@ async def ui_login_submit(
             status_code=status.HTTP_403_FORBIDDEN,
         )
 
+    # 4. Credentials validation
     expected_username = cfg.dashboard_username or "admin"
     expected_cred = cfg.dashboard_password_hash or cfg.dashboard_password
     valid_user = hmac.compare_digest(username.strip(), expected_username.strip())
     valid_pass = verify_password(password, expected_cred) if expected_cred else False
 
     if not (valid_user and valid_pass):
-        logger.warning("Failed dashboard login attempt for username=%r", username)
+        is_now_locked, retry_secs = login_tracker.record_failure(
+            lockout_key,
+            max_failed=cfg.login_max_failed_attempts,
+            lockout_secs=cfg.login_lockout_seconds,
+        )
+        logger.warning("Failed dashboard login attempt for username=%r from %s", username, client_ip)
+        if is_now_locked:
+            err_msg = f"Account temporarily locked due to repeated failed login attempts. Please retry in {retry_secs} seconds."
+            status_code = status.HTTP_429_TOO_MANY_REQUESTS
+            headers = {"Retry-After": str(retry_secs)}
+        else:
+            err_msg = "Invalid username or password"
+            status_code = status.HTTP_401_UNAUTHORIZED
+            headers = None
+
         return templates.TemplateResponse(
             request=request,
             name="login.html",
             context={
                 "csrf_token": _get_or_create_csrf_token(request),
                 "next_url": next,
-                "error": "Invalid username or password",
+                "error": err_msg,
                 "username": username,
             },
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status_code,
+            headers=headers,
         )
+
+    # 5. Clear failed attempt tracker on success
+    login_tracker.record_success(lockout_key)
 
     # Prevent session fixation: clear previous session completely before storing user state
     request.session.clear()
@@ -331,7 +473,7 @@ async def ui_get_bill_media(
 ):
     """
     Serve invoice images strictly to authenticated sessions or authorized API callers.
-    Replaces unauthenticated public static directory exposure.
+    Guarantees strict path traversal containment within MEDIA_DIR.
     """
     cfg: Settings = getattr(request.app.state, "settings", settings)
     user = _get_session_user(request)
@@ -346,8 +488,13 @@ async def ui_get_bill_media(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-    media_jpg = MEDIA_DIR / f"{bill_id}.jpg"
-    media_png = MEDIA_DIR / f"{bill_id}.png"
+    media_jpg = (MEDIA_DIR / f"{bill_id}.jpg").resolve()
+    media_png = (MEDIA_DIR / f"{bill_id}.png").resolve()
+    media_dir_resolved = MEDIA_DIR.resolve()
+
+    if not (media_jpg.is_relative_to(media_dir_resolved) and media_png.is_relative_to(media_dir_resolved)):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid bill ID format")
+
     if media_jpg.exists():
         return FileResponse(media_jpg, media_type="image/jpeg")
     elif media_png.exists():
@@ -489,18 +636,55 @@ async def ui_upload_bill(
         if not verify_csrf_token(session_csrf, token):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing CSRF token")
 
-    engine: WorkflowEngine = request.app.state.engine
-    content = await file.read()
+    # Rate limiting check on UI uploads
+    try:
+        check_rate_limit(
+            request,
+            scope="upload",
+            max_requests=cfg.rate_limit_upload_per_minute,
+            enabled=cfg.rate_limit_enabled,
+        )
+    except HTTPException as exc:
+        return RedirectResponse(
+            url=f"/ui/bills?msg=Upload+failed:+{quote(exc.detail)}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    # Memory-safe upload reading with Content-Length check and 5 MB limit
+    try:
+        content = await read_upload_file_safely(
+            file=file,
+            max_bytes=cfg.bill_size_limit_bytes,
+            request=request,
+        )
+    except HTTPException as exc:
+        return RedirectResponse(
+            url=f"/ui/bills?msg=Upload+failed:+{quote(exc.detail)}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
     if not content:
         return RedirectResponse(
             url="/ui/bills?msg=Upload+failed:+Uploaded+file+was+empty",
             status_code=status.HTTP_303_SEE_OTHER,
         )
+
+    # Validate binary magic bytes (JPEG or PNG)
+    try:
+        detected_mime = validate_image_magic_bytes(content)
+    except ValueError as exc:
+        safe_msg = sanitize_user_facing_error(str(exc))
+        return RedirectResponse(
+            url=f"/ui/bills?msg=Upload+failed:+{quote(safe_msg)}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    engine: WorkflowEngine = request.app.state.engine
     try:
         bill_id = await engine.intake_uploaded_bill(
             image_bytes=content,
             filename=file.filename or "uploaded_bill.jpg",
-            mime_type=file.content_type or "image/jpeg",
+            mime_type=detected_mime,
             sender="web-dashboard",
         )
         if scan_now:
@@ -513,10 +697,16 @@ async def ui_upload_bill(
             url=f"/ui/bills?status_filter=QUEUED&msg=Bill+{bill_id}+uploaded+successfully+and+queued+for+scan",
             status_code=status.HTTP_303_SEE_OTHER,
         )
-    except Exception as exc:
-        logger.error("Web UI upload failed: %s", exc)
+    except ValueError as exc:
+        safe_msg = sanitize_user_facing_error(str(exc))
         return RedirectResponse(
-            url=f"/ui/bills?msg=Upload+failed:+{str(exc)}",
+            url=f"/ui/bills?msg=Upload+failed:+{quote(safe_msg)}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    except Exception as exc:
+        logger.exception("Web UI upload failed: %s", exc)
+        return RedirectResponse(
+            url="/ui/bills?msg=Upload+failed:+An+internal+server+error+occurred",
             status_code=status.HTTP_303_SEE_OTHER,
         )
 
@@ -834,6 +1024,14 @@ async def ui_trigger_worker(
         session_csrf = request.session.get("csrf_token") if hasattr(request, "session") else None
         if not verify_csrf_token(session_csrf, token):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing CSRF token")
+
+    # Rate limiting on worker triggers
+    check_rate_limit(
+        request,
+        scope="worker",
+        max_requests=cfg.rate_limit_worker_per_minute,
+        enabled=cfg.rate_limit_enabled,
+    )
 
     engine: WorkflowEngine = request.app.state.engine
     stage_norm = stage.lower().strip()

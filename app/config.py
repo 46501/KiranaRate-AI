@@ -146,6 +146,31 @@ class Settings(BaseSettings):
     """Secret API key for authenticating REST API calls and financial exports."""
 
     # ------------------------------------------------------------------
+    # Rate Limiting & Brute-Force Protection (Priority 3 Security)
+    # ------------------------------------------------------------------
+
+    rate_limit_enabled: bool = True
+    """When True, rate limiting is actively enforced on sensitive endpoints."""
+
+    rate_limit_login_per_minute: int = 10
+    """Maximum allowed login requests per minute per IP."""
+
+    rate_limit_upload_per_minute: int = 20
+    """Maximum allowed bill upload requests per minute per IP."""
+
+    rate_limit_webhook_per_minute: int = 120
+    """Maximum allowed WhatsApp webhook requests per minute per IP."""
+
+    rate_limit_worker_per_minute: int = 30
+    """Maximum allowed manual worker triggers per minute per IP."""
+
+    login_max_failed_attempts: int = 5
+    """Maximum consecutive failed login attempts before temporary account lockout."""
+
+    login_lockout_seconds: int = 300
+    """Duration in seconds (5 minutes) for account lockout after exceeding failed attempts."""
+
+    # ------------------------------------------------------------------
     # Bill / Media Constraints
     # ------------------------------------------------------------------
 

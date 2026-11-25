@@ -37,6 +37,17 @@ from app.storage.sqlite_store import SQLiteStore
 UTC = timezone.utc
 
 
+@pytest.fixture(autouse=True)
+def _reset_security_state():
+    """Ensure in-memory rate limiters and login attempt trackers are reset before each test."""
+    from app.services.security import login_tracker, rate_limiter
+    rate_limiter.reset()
+    login_tracker.reset()
+    yield
+    rate_limiter.reset()
+    login_tracker.reset()
+
+
 @pytest.fixture
 def test_settings() -> Settings:
     """Settings configured specifically for offline unit/integration tests."""

@@ -40,6 +40,7 @@ from app.models import (
     Reviewed,
 )
 from app.services.gemini_scanner import GeminiScanner, MockGeminiScanner
+from app.services.security import validate_image_magic_bytes
 from app.services.whatsapp import (
     BillIntakeEvent,
     MockWhatsAppClient,
@@ -284,16 +285,16 @@ class WorkflowEngine:
         3. Save file into media directory.
         4. Insert Bill record with status QUEUED.
         """
-        # Normalize and validate MIME
+        # 1. Validate binary magic bytes (JPEG / PNG signature)
+        detected_mime = validate_image_magic_bytes(image_bytes)
+
+        # 2. Normalize and validate requested MIME
         clean_mime = (mime_type or "").lower().strip()
-        if clean_mime == "image/png" or (not clean_mime and filename.lower().endswith(".png")):
-            effective_mime = "image/png"
-            ext = ".png"
-        elif clean_mime in ("image/jpeg", "image/jpg") or (not clean_mime and filename.lower().endswith((".jpg", ".jpeg"))):
-            effective_mime = "image/jpeg"
-            ext = ".jpg"
-        else:
+        if clean_mime and clean_mime not in ("image/png", "image/jpeg", "image/jpg"):
             raise ValueError(f"Unsupported MIME type {mime_type!r}; only image/jpeg and image/png are accepted.")
+
+        effective_mime = detected_mime
+        ext = ".png" if detected_mime == "image/png" else ".jpg"
 
         size_limit = self._settings.bill_size_limit_bytes
         if len(image_bytes) > size_limit:
@@ -386,6 +387,10 @@ class WorkflowEngine:
                     f"Unsupported MIME type {effective_mime!r}; "
                     f"only image/jpeg and image/png are accepted."
                 )
+
+            # ── Validate binary magic bytes ───────────────────────────
+            if not (self._settings.mock_whatsapp and image_bytes.startswith(b"fake_")):
+                validate_image_magic_bytes(image_bytes)
 
             # ── Validate file size ─────────────────────────────────────
             size_limit = self._settings.bill_size_limit_bytes

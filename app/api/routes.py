@@ -30,6 +30,12 @@ from app.schemas import (
 )
 from app.services.accounting_export import AccountingExporter
 from app.services.negotiation_generator import NegotiationGenerator
+from app.services.security import (
+    check_rate_limit,
+    read_upload_file_safely,
+    sanitize_user_facing_error,
+    validate_image_magic_bytes,
+)
 from app.services.sku_matcher import SKUMatcher
 from app.services.tax_engine import TaxEngine
 from app.services.whatsapp import verify_webhook_signature
@@ -114,6 +120,7 @@ async def health_check() -> dict:
 
 @router.get("/webhook/whatsapp")
 async def verify_whatsapp_webhook(
+    request: Request,
     hub_mode: Optional[str] = Query(None, alias="hub.mode"),
     hub_verify_token: Optional[str] = Query(None, alias="hub.verify_token"),
     hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
@@ -123,6 +130,12 @@ async def verify_whatsapp_webhook(
     Handle Meta WhatsApp webhook subscription verification challenge.
     Uses constant-time comparison to prevent timing side-channel attacks.
     """
+    check_rate_limit(
+        request,
+        scope="webhook",
+        max_requests=settings.rate_limit_webhook_per_minute,
+        enabled=settings.rate_limit_enabled,
+    )
     if (
         hub_mode == "subscribe"
         and hub_verify_token
@@ -144,6 +157,12 @@ async def receive_whatsapp_webhook(
     Inbound WhatsApp webhook endpoint.
     Verifies Meta X-Hub-Signature-256 HMAC signature and processes image bills asynchronously.
     """
+    check_rate_limit(
+        request,
+        scope="webhook",
+        max_requests=settings.rate_limit_webhook_per_minute,
+        enabled=settings.rate_limit_enabled,
+    )
     raw_body = await request.body()
     sig_header = request.headers.get("X-Hub-Signature-256") or request.headers.get("x-hub-signature-256")
 
@@ -181,18 +200,21 @@ async def receive_whatsapp_webhook(
 
     try:
         payload = json.loads(raw_body.decode("utf-8") if raw_body else "{}")
-    except Exception as exc:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid JSON payload: {exc}",
+            detail="Invalid JSON payload in request body",
         )
 
     try:
         inserted_bill_ids = await engine.run_intake(payload)
         return {"status": "ok", "inserted_count": len(inserted_bill_ids), "bill_ids": inserted_bill_ids}
+    except ValueError as exc:
+        logger.warning("Intake webhook validation error: %s", exc)
+        return {"status": "error", "message": sanitize_user_facing_error(str(exc))}
     except Exception as exc:
         logger.exception("Error processing intake webhook: %s", exc)
-        return {"status": "error", "message": str(exc)}
+        return {"status": "error", "message": "Failed to process webhook intake"}
 
 
 # ---------------------------------------------------------------------------
@@ -211,22 +233,44 @@ async def list_bills(
 
 @router.post("/bills/upload")
 async def upload_bill(
+    request: Request,
     file: UploadFile = File(...),
     sender: str = Query("web-upload", description="Sender label or phone number"),
     engine: WorkflowEngine = Depends(get_engine),
+    settings: Settings = Depends(get_settings),
     _auth: str = Depends(require_auth),
 ) -> dict:
     """
     Directly upload an invoice image (JPEG or PNG) to queue it for AI scanning.
+    Enforces rate limiting, Content-Length checks, memory-safe chunked reading, and magic byte validation.
     """
-    content = await file.read()
+    check_rate_limit(
+        request,
+        scope="upload",
+        max_requests=settings.rate_limit_upload_per_minute,
+        enabled=settings.rate_limit_enabled,
+    )
+
+    # Memory-safe chunked reading with Content-Length pre-flight check
+    content = await read_upload_file_safely(
+        file=file,
+        max_bytes=settings.bill_size_limit_bytes,
+        request=request,
+    )
     if not content:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file is empty")
+
+    # Binary magic byte validation
+    try:
+        detected_mime = validate_image_magic_bytes(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
     try:
         bill_id = await engine.intake_uploaded_bill(
             image_bytes=content,
             filename=file.filename or "upload.jpg",
-            mime_type=file.content_type or "image/jpeg",
+            mime_type=detected_mime,
             sender=sender,
         )
         return {
@@ -235,7 +279,7 @@ async def upload_bill(
             "message": "Bill uploaded successfully and queued for AI scan.",
         }
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=sanitize_user_facing_error(str(exc)))
     except Exception as exc:
         logger.exception("Failed to intake uploaded bill: %s", exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process uploaded bill")
@@ -424,7 +468,9 @@ async def reject_bill(
 @router.post("/workers/run/{stage}")
 async def trigger_worker(
     stage: str,
+    request: Request,
     engine: WorkflowEngine = Depends(get_engine),
+    settings: Settings = Depends(get_settings),
     _auth: str = Depends(require_auth),
 ) -> dict:
     """
@@ -434,6 +480,12 @@ async def trigger_worker(
       - 'post'  : pick oldest APPROVED bill, validate & post purchases/alerts
       - 'alert' : pick oldest PENDING alert and dispatch via WhatsApp
     """
+    check_rate_limit(
+        request,
+        scope="worker",
+        max_requests=settings.rate_limit_worker_per_minute,
+        enabled=settings.rate_limit_enabled,
+    )
     normalized_stage = stage.lower().strip()
     if normalized_stage == "scan":
         processed_id = await engine.run_scan_worker()
