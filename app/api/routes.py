@@ -19,7 +19,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import PlainTextResponse
 
-from app.api.dependencies import get_engine, get_settings, get_store
+from app.api.dependencies import get_engine, get_settings, get_store, require_auth
 from app.config import Settings, is_placeholder
 from app.models import Bill, BillStatus, CostBasis, HeaderVerified, Reviewed, ReviewLine
 from app.schemas import (
@@ -214,6 +214,7 @@ async def upload_bill(
     file: UploadFile = File(...),
     sender: str = Query("web-upload", description="Sender label or phone number"),
     engine: WorkflowEngine = Depends(get_engine),
+    _auth: str = Depends(require_auth),
 ) -> dict:
     """
     Directly upload an invoice image (JPEG or PNG) to queue it for AI scanning.
@@ -258,6 +259,7 @@ async def approve_bill(
     bill_id: str,
     req: ApproveRequest,
     store: BaseStore = Depends(get_store),
+    _auth: str = Depends(require_auth),
 ) -> BillResponse:
     """
     Approve a bill from REVIEW to APPROVED status.
@@ -302,6 +304,7 @@ async def approve_bill(
 async def quick_approve_bill(
     bill_id: str,
     store: BaseStore = Depends(get_store),
+    _auth: str = Depends(require_auth),
 ) -> BillResponse:
     """
     1-Click Quick Approval endpoint: automatically applies suggested SKUs,
@@ -394,6 +397,7 @@ async def reject_bill(
     bill_id: str,
     req: RejectRequest,
     store: BaseStore = Depends(get_store),
+    _auth: str = Depends(require_auth),
 ) -> BillResponse:
     """Reject a bill permanently with a specified reason."""
     bill = store.get_bill(bill_id)
@@ -421,6 +425,7 @@ async def reject_bill(
 async def trigger_worker(
     stage: str,
     engine: WorkflowEngine = Depends(get_engine),
+    _auth: str = Depends(require_auth),
 ) -> dict:
     """
     Manually trigger one execution cycle of a specific pipeline worker.
@@ -609,6 +614,7 @@ async def get_analytics_summary(
 @router.get("/export/csv")
 async def export_purchases_csv(
     store: BaseStore = Depends(get_store),
+    _auth: str = Depends(require_auth),
 ) -> Response:
     """Export purchase transactions to CSV for Excel / Google Sheets."""
     csv_data = AccountingExporter.generate_csv(store)
@@ -624,6 +630,7 @@ async def export_purchases_csv(
 @router.get("/export/tally")
 async def export_tally_xml(
     store: BaseStore = Depends(get_store),
+    _auth: str = Depends(require_auth),
 ) -> Response:
     """Export posted purchase vouchers formatted for direct Tally Prime XML import."""
     xml_data = AccountingExporter.generate_tally_xml(store)

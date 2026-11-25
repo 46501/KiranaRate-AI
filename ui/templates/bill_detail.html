@@ -728,11 +728,14 @@
         </div>
       </div>
 
-      <div>
+      <div style="display:flex; align-items:center; gap:10px;">
         <span class="status-pill badge-{{ bill.status.value }}">
           <span class="status-dot"></span>
           Status: {{ bill.status.value }}
         </span>
+        {% if current_user %}
+        <a href="/ui/logout" class="btn" style="background:#fef2f2; border:1px solid #fecaca; color:#dc2626; text-decoration:none; font-weight:600; padding:6px 12px; border-radius:6px; font-size:12px;" title="Sign out of KiranaIQ session">Sign Out</a>
+        {% endif %}
       </div>
     </header>
 
@@ -888,6 +891,7 @@
 
         <!-- APPROVAL & SKU MAPPING FORM -->
         <form action="/ui/bills/{{ bill.bill_id }}/approve" method="POST" id="approvalForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
           <!-- STEP 1: HEADER & SUPPLIER VERIFICATION -->
           <div class="panel-card">
@@ -975,9 +979,15 @@
                     <label style="margin:0;">Canonical SKU <span class="req">*</span></label>
                     {% if suggestions and suggestions.get(ln.review_id) %}
                     {% set sug = suggestions.get(ln.review_id) %}
-                    <span style="font-size:11px; font-weight:600; padding:2px 7px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; {% if sug.confidence >= 75 %}background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;{% else %}background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe;{% endif %}">
+                    {% if sug.confidence >= 75 %}
+                    <span style="font-size:11px; font-weight:600; padding:2px 7px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;">
                       ✨ {{ sug.confidence }}% Match
                     </span>
+                    {% else %}
+                    <span style="font-size:11px; font-weight:600; padding:2px 7px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe;">
+                      ✨ {{ sug.confidence }}% Match
+                    </span>
+                    {% endif %}
                     {% endif %}
                   </div>
                   <select name="sku_{{ ln.review_id }}" id="sku_select_{{ ln.review_id }}" required>
@@ -1073,6 +1083,7 @@
           </div>
 
           <form action="/ui/bills/{{ bill.bill_id }}/reject" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="form-grid-2">
               <div class="form-group">
                 <label>Reviewer Name <span class="req">*</span></label>

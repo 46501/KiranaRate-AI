@@ -1056,16 +1056,19 @@
 
         <!-- Worker Controls with instant loading feedback -->
         <form action="/ui/workers/run/scan" method="POST" style="margin:0;" onsubmit="var b=this.querySelector('button'); b.disabled=true; b.innerHTML='⏳ Scanning...';">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="btn btn-worker" title="Scan oldest queued bill with Gemini Vision">
             ▶ Run Scan Worker
           </button>
         </form>
         <form action="/ui/workers/run/post" method="POST" style="margin:0;" onsubmit="var b=this.querySelector('button'); b.disabled=true; b.innerHTML='⏳ Posting...';">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="btn btn-worker" title="Post oldest approved bill & run rate comparison">
             ▶ Run Post Worker
           </button>
         </form>
         <form action="/ui/workers/run/alert" method="POST" style="margin:0;" onsubmit="var b=this.querySelector('button'); b.disabled=true; b.innerHTML='⏳ Dispatching...';">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="btn btn-worker" title="Dispatch oldest pending alert via WhatsApp">
             ▶ Run Alert Outbox
           </button>
@@ -1073,6 +1076,9 @@
 
         <a href="/workers/status" target="_blank" class="btn btn-secondary">Workers Status</a>
         <a href="/docs" target="_blank" class="btn btn-secondary">API Docs</a>
+        {% if current_user %}
+        <a href="/ui/logout" class="btn" style="background:#fef2f2; border:1px solid #fecaca; color:#dc2626; text-decoration:none; font-weight:600; padding:6px 12px; border-radius:6px; font-size:12px;" title="Sign out of KiranaIQ session">Sign Out</a>
+        {% endif %}
       </div>
     </header>
 
@@ -1335,6 +1341,7 @@
                   <div style="display:inline-flex; align-items:center; gap:6px;">
                     {% if b.status.value == 'REVIEW' %}
                     <form action="/ui/bills/{{ b.bill_id }}/quick-approve" method="POST" style="margin:0;">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                       <button type="submit" class="btn btn-secondary" title="Quick-approve bill and auto-post to ledger" style="font-size:11.5px; padding:4px 8px; color:#059669; border-color:#a7f3d0; background:#ecfdf5; font-weight:600; display:inline-flex; align-items:center; gap:3px;">
                         ⚡ Quick Approve
                       </button>
@@ -1395,9 +1402,15 @@
                 <span style="font-size:11px; font-weight:700; color:var(--primary); font-family:var(--font-mono);">{{ item.sku }}</span>
                 <div style="font-size:13.5px; font-weight:700; color:var(--text-main); margin-top:2px;">{{ item.product_name }}</div>
               </div>
-              <span style="font-size:11px; font-weight:700; padding:2px 7px; border-radius:12px; {% if item.volatility > 5 %}background:#fee2e2; color:#dc2626; border:1px solid #fecaca;{% else %}background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;{% endif %}">
+              {% if item.volatility > 5 %}
+              <span style="font-size:11px; font-weight:700; padding:2px 7px; border-radius:12px; background:#fee2e2; color:#dc2626; border:1px solid #fecaca;">
                 {{ "%.1f"|format(item.volatility) }}% Volatility
               </span>
+              {% else %}
+              <span style="font-size:11px; font-weight:700; padding:2px 7px; border-radius:12px; background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;">
+                {{ "%.1f"|format(item.volatility) }}% Volatility
+              </span>
+              {% endif %}
             </div>
             <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid #eaecf0;">
               <div>
@@ -1769,6 +1782,7 @@
       </div>
 
       <form action="/ui/upload" method="POST" enctype="multipart/form-data" style="padding:22px 24px; margin:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <p style="font-size:13px; color:var(--text-muted); margin:0 0 16px 0;">
           Upload a paper bill photo or digital invoice image (JPEG / PNG). It will be queued for Gemini Vision OCR and price arbitrage extraction.
         </p>

@@ -124,6 +124,28 @@ class Settings(BaseSettings):
     """IANA timezone name used for all IST-based business-rule calculations."""
 
     # ------------------------------------------------------------------
+    # Authentication, Session & Access Control
+    # ------------------------------------------------------------------
+
+    dashboard_username: str = "admin"
+    """Administrator username for dashboard login."""
+
+    dashboard_password_hash: str = ""
+    """PBKDF2-SHA256 password hash for dashboard login."""
+
+    dashboard_password: str = ""
+    """Plain text password fallback from env (verified securely or hashed)."""
+
+    session_secret_key: str = "kirana-iq-secret-session-key-must-be-changed-in-production"
+    """Secret key used to cryptographically sign session cookies."""
+
+    session_cookie_secure: bool = False
+    """Set to True in production with HTTPS/TLS to enforce secure-only cookies."""
+
+    api_key: str = ""
+    """Secret API key for authenticating REST API calls and financial exports."""
+
+    # ------------------------------------------------------------------
     # Bill / Media Constraints
     # ------------------------------------------------------------------
 
@@ -209,6 +231,17 @@ class Settings(BaseSettings):
     def whatsapp_alert_recipient(self) -> str:
         """Alias for whatsapp_owner_number."""
         return self.whatsapp_owner_number
+
+    @property
+    def is_auth_enabled(self) -> bool:
+        """Return True if dashboard/API authentication is active."""
+        if not self.mock_whatsapp:
+            return True
+        return bool(
+            (self.dashboard_password and not is_placeholder(self.dashboard_password))
+            or (self.dashboard_password_hash and not is_placeholder(self.dashboard_password_hash))
+            or (self.api_key and not is_placeholder(self.api_key))
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -8,17 +8,19 @@ and registers both API and reviewer UI routes.
 
 from __future__ import annotations
 
+import hmac
 import logging
 from contextlib import asynccontextmanager
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile, status
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.api.routes import router as api_router
 from app.config import Settings, is_placeholder, settings
@@ -28,6 +30,7 @@ from app.models import (
     HeaderVerified,
     Reviewed,
 )
+from app.services.auth import generate_csrf_token, hash_password, verify_csrf_token, verify_password
 from app.services.gemini_scanner import GeminiScanner, MockGeminiScanner
 from app.services.sku_matcher import SKUMatcher
 from app.services.tax_engine import TaxEngine
@@ -191,11 +194,165 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Secure session middleware for dashboard authentication & anti-fixation protection
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.session_secret_key,
+    session_cookie="kirana_session",
+    max_age=14 * 24 * 3600,
+    same_site="lax",
+    https_only=settings.session_cookie_secure,
+)
+
 # Include JSON API routes
 app.include_router(api_router, tags=["API"])
 
-# Mount media directory for invoice previews
-app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
+
+# ---------------------------------------------------------------------------
+# Session & CSRF Security Helpers
+# ---------------------------------------------------------------------------
+
+def _get_session_user(request: Request) -> Optional[str]:
+    """Retrieve logged in username from session, or None."""
+    if hasattr(request, "session"):
+        return request.session.get("authenticated_user")
+    return None
+
+
+def _require_ui_session(request: Request) -> Optional[str]:
+    """
+    Validate that user has an active session.
+    Returns username if authorized, or None if authentication is required.
+    """
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    user = _get_session_user(request)
+    if user:
+        return user
+    if cfg.is_auth_enabled:
+        return None
+    # In open local dev mode with no credentials configured:
+    return "admin"
+
+
+def _get_or_create_csrf_token(request: Request) -> str:
+    """Ensure a CSRF token exists on the session and return it."""
+    if not hasattr(request, "session"):
+        return ""
+    token = request.session.get("csrf_token")
+    if not token:
+        token = generate_csrf_token()
+        request.session["csrf_token"] = token
+    return str(token)
+
+
+# ---------------------------------------------------------------------------
+# Authentication UI Routes (Login / Logout) & Protected Media
+# ---------------------------------------------------------------------------
+
+@app.get("/ui/login", response_class=HTMLResponse)
+async def ui_login_page(request: Request, next: Optional[str] = None):
+    """Render dashboard login form."""
+    if _get_session_user(request):
+        return RedirectResponse(url=next or "/ui/bills", status_code=status.HTTP_303_SEE_OTHER)
+    csrf_token = _get_or_create_csrf_token(request)
+    return templates.TemplateResponse(
+        request=request,
+        name="login.html",
+        context={"csrf_token": csrf_token, "next_url": next, "error": None},
+    )
+
+
+@app.post("/ui/login", response_class=HTMLResponse)
+async def ui_login_submit(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    csrf_token: str = Form(""),
+    next: Optional[str] = Form(None),
+):
+    """Process dashboard login credentials, prevent session fixation, and set cookie."""
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    session_csrf = request.session.get("csrf_token") if hasattr(request, "session") else None
+    if not verify_csrf_token(session_csrf, csrf_token):
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "csrf_token": _get_or_create_csrf_token(request),
+                "next_url": next,
+                "error": "Invalid or expired CSRF token",
+                "username": username,
+            },
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    expected_username = cfg.dashboard_username or "admin"
+    expected_cred = cfg.dashboard_password_hash or cfg.dashboard_password
+    valid_user = hmac.compare_digest(username.strip(), expected_username.strip())
+    valid_pass = verify_password(password, expected_cred) if expected_cred else False
+
+    if not (valid_user and valid_pass):
+        logger.warning("Failed dashboard login attempt for username=%r", username)
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "csrf_token": _get_or_create_csrf_token(request),
+                "next_url": next,
+                "error": "Invalid username or password",
+                "username": username,
+            },
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    # Prevent session fixation: clear previous session completely before storing user state
+    request.session.clear()
+    request.session["authenticated_user"] = username.strip()
+    request.session["csrf_token"] = generate_csrf_token()
+    request.session["login_time"] = datetime.now(timezone.utc).isoformat()
+    logger.info("Successful dashboard login for username=%r", username)
+
+    target = next if (next and next.startswith("/") and not next.startswith("//")) else "/ui/bills"
+    return RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/ui/logout")
+async def ui_logout(request: Request):
+    """Log out of dashboard and clear session cookie."""
+    if hasattr(request, "session"):
+        request.session.clear()
+    return RedirectResponse(url="/ui/login", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/ui/media/{bill_id}")
+async def ui_get_bill_media(
+    bill_id: str,
+    request: Request,
+):
+    """
+    Serve invoice images strictly to authenticated sessions or authorized API callers.
+    Replaces unauthenticated public static directory exposure.
+    """
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    user = _get_session_user(request)
+    if not user and cfg.is_auth_enabled:
+        auth_h = request.headers.get("Authorization", "").strip()
+        key_h = request.headers.get("X-API-Key", "").strip()
+        token = auth_h[7:].strip() if auth_h.startswith("Bearer ") else key_h
+        if not (token and cfg.api_key and hmac.compare_digest(token, cfg.api_key)):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required to view invoice image",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    media_jpg = MEDIA_DIR / f"{bill_id}.jpg"
+    media_png = MEDIA_DIR / f"{bill_id}.png"
+    if media_jpg.exists():
+        return FileResponse(media_jpg, media_type="image/jpeg")
+    elif media_png.exists():
+        return FileResponse(media_png, media_type="image/png")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Invoice image for bill '{bill_id}' not found on disk")
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +367,11 @@ async def ui_bills_dashboard(
     view: Optional[str] = None,
 ):
     """Render KiranaIQ purchase intelligence dashboard with multi-view navigation."""
+    user = _require_ui_session(request)
+    if not user:
+        next_path = quote(request.url.path + (f"?{request.url.query}" if request.url.query else ""))
+        return RedirectResponse(url=f"/ui/login?next={next_path}", status_code=status.HTTP_303_SEE_OTHER)
+
     store: SQLiteStore = request.app.state.store
     filter_enum = None
     if status_filter and status_filter.upper() != "ALL":
@@ -302,6 +464,8 @@ async def ui_bills_dashboard(
             "now_ist": now_ist,
             "scheduler_running": scheduler_running,
             "settings": request.app.state.settings,
+            "csrf_token": _get_or_create_csrf_token(request),
+            "current_user": user,
         },
     )
 
@@ -311,8 +475,20 @@ async def ui_upload_bill(
     request: Request,
     file: UploadFile = File(...),
     scan_now: bool = Form(False),
+    csrf_token: Optional[str] = Form(None),
 ):
     """Handle direct file upload from web UI and optionally trigger scan immediately."""
+    user = _require_ui_session(request)
+    if not user:
+        return RedirectResponse(url="/ui/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    if cfg.is_auth_enabled:
+        session_csrf = request.session.get("csrf_token") if hasattr(request, "session") else None
+        token = csrf_token or request.headers.get("X-CSRF-Token")
+        if not verify_csrf_token(session_csrf, token):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing CSRF token")
+
     engine: WorkflowEngine = request.app.state.engine
     content = await file.read()
     if not content:
@@ -348,6 +524,11 @@ async def ui_upload_bill(
 @app.get("/ui/bills/{bill_id}", response_class=HTMLResponse)
 async def ui_bill_detail(request: Request, bill_id: str, msg: Optional[str] = None):
     """Render detailed bill inspection and review form."""
+    user = _require_ui_session(request)
+    if not user:
+        next_path = quote(request.url.path + (f"?{request.url.query}" if request.url.query else ""))
+        return RedirectResponse(url=f"/ui/login?next={next_path}", status_code=status.HTTP_303_SEE_OTHER)
+
     store: SQLiteStore = request.app.state.store
     bill = store.get_bill(bill_id)
     if not bill:
@@ -373,10 +554,8 @@ async def ui_bill_detail(request: Request, bill_id: str, msg: Optional[str] = No
     image_url = None
     media_jpg = MEDIA_DIR / f"{bill.bill_id}.jpg"
     media_png = MEDIA_DIR / f"{bill.bill_id}.png"
-    if media_jpg.exists():
-        image_url = f"/media/{bill.bill_id}.jpg"
-    elif media_png.exists():
-        image_url = f"/media/{bill.bill_id}.png"
+    if media_jpg.exists() or media_png.exists():
+        image_url = f"/ui/media/{bill.bill_id}"
 
     return templates.TemplateResponse(
         request=request,
@@ -389,6 +568,8 @@ async def ui_bill_detail(request: Request, bill_id: str, msg: Optional[str] = No
             "suggestions": suggestions,
             "msg": msg,
             "image_url": image_url,
+            "csrf_token": _get_or_create_csrf_token(request),
+            "current_user": user,
         },
     )
 
@@ -399,8 +580,19 @@ async def ui_approve_bill(
     bill_id: str,
 ):
     """Handle HTML form submission for bill approval."""
-    store: SQLiteStore = request.app.state.store
+    user = _require_ui_session(request)
+    if not user:
+        return RedirectResponse(url="/ui/login", status_code=status.HTTP_303_SEE_OTHER)
+
     form_data = await request.form()
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    if cfg.is_auth_enabled:
+        token = form_data.get("csrf_token") or request.headers.get("X-CSRF-Token")
+        session_csrf = request.session.get("csrf_token") if hasattr(request, "session") else None
+        if not verify_csrf_token(session_csrf, token):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing CSRF token")
+
+    store: SQLiteStore = request.app.state.store
 
     reviewer = str(form_data.get("reviewer", "")).strip()
     supplier_id = str(form_data.get("supplier_id", "")).strip()
@@ -477,8 +669,20 @@ async def ui_reject_bill(
     bill_id: str,
     reviewer: str = Form(...),
     reason: str = Form(...),
+    csrf_token: Optional[str] = Form(None),
 ):
     """Handle HTML form submission for bill rejection."""
+    user = _require_ui_session(request)
+    if not user:
+        return RedirectResponse(url="/ui/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    if cfg.is_auth_enabled:
+        token = csrf_token or request.headers.get("X-CSRF-Token")
+        session_csrf = request.session.get("csrf_token") if hasattr(request, "session") else None
+        if not verify_csrf_token(session_csrf, token):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing CSRF token")
+
     store: SQLiteStore = request.app.state.store
     store.update_bill(
         bill_id,
@@ -496,12 +700,24 @@ async def ui_reject_bill(
 async def ui_quick_approve_bill(
     request: Request,
     bill_id: str,
+    csrf_token: Optional[str] = Form(None),
 ):
     """
     1-Click Quick Approval from Dashboard for bills with high-confidence extractions.
     Automatically assigns suggested SKUs, marks header verified, balances paise,
     and transitions status to APPROVED (and triggers Post Worker).
     """
+    user = _require_ui_session(request)
+    if not user:
+        return RedirectResponse(url="/ui/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    if cfg.is_auth_enabled:
+        token = csrf_token or request.headers.get("X-CSRF-Token")
+        session_csrf = request.session.get("csrf_token") if hasattr(request, "session") else None
+        if not verify_csrf_token(session_csrf, token):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing CSRF token")
+
     store: SQLiteStore = request.app.state.store
     engine: WorkflowEngine = request.app.state.engine
 
@@ -602,8 +818,23 @@ async def ui_quick_approve_bill(
 
 
 @app.post("/ui/workers/run/{stage}")
-async def ui_trigger_worker(request: Request, stage: str):
+async def ui_trigger_worker(
+    request: Request,
+    stage: str,
+    csrf_token: Optional[str] = Form(None),
+):
     """Trigger worker and redirect back to dashboard."""
+    user = _require_ui_session(request)
+    if not user:
+        return RedirectResponse(url="/ui/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    if cfg.is_auth_enabled:
+        token = csrf_token or request.headers.get("X-CSRF-Token")
+        session_csrf = request.session.get("csrf_token") if hasattr(request, "session") else None
+        if not verify_csrf_token(session_csrf, token):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing CSRF token")
+
     engine: WorkflowEngine = request.app.state.engine
     stage_norm = stage.lower().strip()
     msg = f"Ran {stage_norm} worker"
