@@ -10,6 +10,8 @@ FastAPI route definitions for the AI Bill Scanner Automation system:
 
 from __future__ import annotations
 
+import hmac
+import json
 import logging
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -18,7 +20,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Res
 from fastapi.responses import PlainTextResponse
 
 from app.api.dependencies import get_engine, get_settings, get_store
-from app.config import Settings
+from app.config import Settings, is_placeholder
 from app.models import Bill, BillStatus, CostBasis, HeaderVerified, Reviewed, ReviewLine
 from app.schemas import (
     ApproveRequest,
@@ -30,6 +32,7 @@ from app.services.accounting_export import AccountingExporter
 from app.services.negotiation_generator import NegotiationGenerator
 from app.services.sku_matcher import SKUMatcher
 from app.services.tax_engine import TaxEngine
+from app.services.whatsapp import verify_webhook_signature
 from app.services.workflow_engine import WorkflowEngine
 from app.storage.base import BaseStore
 
@@ -118,8 +121,14 @@ async def verify_whatsapp_webhook(
 ) -> Response:
     """
     Handle Meta WhatsApp webhook subscription verification challenge.
+    Uses constant-time comparison to prevent timing side-channel attacks.
     """
-    if hub_mode == "subscribe" and hub_verify_token == settings.whatsapp_verify_token:
+    if (
+        hub_mode == "subscribe"
+        and hub_verify_token
+        and settings.whatsapp_verify_token
+        and hmac.compare_digest(hub_verify_token, settings.whatsapp_verify_token)
+    ):
         if hub_challenge is not None:
             return PlainTextResponse(content=hub_challenge, status_code=status.HTTP_200_OK)
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Verification failed")
@@ -127,13 +136,57 @@ async def verify_whatsapp_webhook(
 
 @router.post("/webhook/whatsapp")
 async def receive_whatsapp_webhook(
-    payload: dict,
+    request: Request,
     engine: WorkflowEngine = Depends(get_engine),
+    settings: Settings = Depends(get_settings),
 ) -> dict:
     """
     Inbound WhatsApp webhook endpoint.
-    Processes image bills asynchronously and returns 200 OK.
+    Verifies Meta X-Hub-Signature-256 HMAC signature and processes image bills asynchronously.
     """
+    raw_body = await request.body()
+    sig_header = request.headers.get("X-Hub-Signature-256") or request.headers.get("x-hub-signature-256")
+
+    app_secret = settings.whatsapp_app_secret
+    is_live = not settings.mock_whatsapp
+    has_secret = bool(app_secret and not is_placeholder(app_secret))
+
+    # Verify HMAC signature when app_secret is configured or in live mode
+    if has_secret or is_live:
+        if not sig_header:
+            logger.warning("Rejected WhatsApp webhook POST: missing X-Hub-Signature-256 header")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Missing X-Hub-Signature-256 signature header",
+            )
+        if not has_secret:
+            logger.error("Rejected WhatsApp webhook POST: WHATSAPP_APP_SECRET is not configured in live mode")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Webhook secret not configured",
+            )
+        if not verify_webhook_signature(raw_body, sig_header, app_secret):
+            logger.warning("Rejected WhatsApp webhook POST: invalid X-Hub-Signature-256 signature")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid webhook signature",
+            )
+    elif sig_header:
+        # Signature header provided in mock mode without app_secret configured
+        logger.warning("Rejected WhatsApp webhook POST: signature header provided but WHATSAPP_APP_SECRET not configured")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid webhook signature",
+        )
+
+    try:
+        payload = json.loads(raw_body.decode("utf-8") if raw_body else "{}")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid JSON payload: {exc}",
+        )
+
     try:
         inserted_bill_ids = await engine.run_intake(payload)
         return {"status": "ok", "inserted_count": len(inserted_bill_ids), "bill_ids": inserted_bill_ids}

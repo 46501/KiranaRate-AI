@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.api.routes import router as api_router
-from app.config import Settings, settings
+from app.config import Settings, is_placeholder, settings
 from app.models import (
     BillStatus,
     CostBasis,
@@ -67,14 +67,8 @@ async def lifespan(app: FastAPI):
     store.create_tables()
     store.seed_demo_data()
 
-    def _is_placeholder(val: str | None) -> bool:
-        if not val:
-            return True
-        s = str(val).strip().lower()
-        return s.startswith("your_") or s in ("changeme", "none", "placeholder", "")
-
     # WhatsApp adapter initialization
-    if cfg.mock_whatsapp or _is_placeholder(cfg.whatsapp_access_token):
+    if cfg.mock_whatsapp or is_placeholder(cfg.whatsapp_access_token):
         logger.info("Using MockWhatsAppClient (MOCK_WHATSAPP=true or token unset/placeholder)")
         whatsapp = MockWhatsAppClient(
             template_name=cfg.whatsapp_template_name,
@@ -88,10 +82,11 @@ async def lifespan(app: FastAPI):
             owner_number=cfg.whatsapp_owner_number,
             template_name=cfg.whatsapp_template_name,
             template_lang=cfg.whatsapp_template_lang,
+            app_secret=cfg.whatsapp_app_secret,
         )
 
     # Gemini scanner initialization
-    if cfg.mock_gemini or _is_placeholder(cfg.gemini_api_key):
+    if cfg.mock_gemini or is_placeholder(cfg.gemini_api_key):
         logger.info("Using MockGeminiScanner (MOCK_GEMINI=true or key unset/placeholder)")
         scanner = MockGeminiScanner()
     else:

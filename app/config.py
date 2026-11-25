@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     whatsapp_verify_token: str = "changeme"
     """Secret token echoed back during webhook subscription verification."""
 
+    whatsapp_app_secret: str = ""
+    """Meta App Secret used to verify X-Hub-Signature-256 HMAC on inbound webhooks."""
+
     whatsapp_access_token: str = ""
     """Long-lived access token from the Meta App Dashboard."""
 
@@ -213,3 +216,12 @@ class Settings(BaseSettings):
 # ---------------------------------------------------------------------------
 
 settings = Settings()
+
+
+def is_placeholder(val: str | None) -> bool:
+    """Return True if val is empty, None, or a common template placeholder."""
+    if not val:
+        return True
+    s = str(val).strip().lower()
+    return s.startswith("your_") or s in ("changeme", "none", "placeholder", "")
+

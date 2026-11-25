@@ -367,6 +367,8 @@ async def run_live_connectivity_probe() -> bool:
     print(f"  ✓ Template Name: {cfg.whatsapp_template_name}")
     print(f"  ✓ Template Language: {cfg.whatsapp_template_lang}")
     print(f"  ✓ Webhook Verify Token: {cfg.whatsapp_verify_token}")
+    has_secret = bool(cfg.whatsapp_app_secret and not _is_placeholder(cfg.whatsapp_app_secret))
+    print(f"  ✓ Webhook App Secret: {'CONFIGURED (X-Hub-Signature-256 enabled)' if has_secret else 'NOT SET / MOCK (Signature check bypassed in mock mode)'}")
     print(f"  ✓ Mock Toggles: MOCK_WHATSAPP={cfg.mock_whatsapp}, MOCK_GEMINI={cfg.mock_gemini}, DRY_RUN={cfg.dry_run}")
 
     print("\n" + "=" * 70)

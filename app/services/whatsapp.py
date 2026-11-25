@@ -10,6 +10,8 @@ Provides:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -19,6 +21,55 @@ import httpx
 
 UTC = timezone.utc
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Webhook Signature Utilities (HMAC-SHA256)
+# ---------------------------------------------------------------------------
+
+def compute_webhook_signature(raw_body: bytes, app_secret: str) -> str:
+    """
+    Compute Meta X-Hub-Signature-256 for a raw request body and app secret.
+
+    Returns the signature formatted as 'sha256=<hex_digest>'.
+    """
+    if not app_secret:
+        return ""
+    digest = hmac.new(
+        app_secret.encode("utf-8"),
+        raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+    return f"sha256={digest}"
+
+
+def verify_webhook_signature(
+    raw_body: bytes,
+    signature_header: str | None,
+    app_secret: str,
+) -> bool:
+    """
+    Validate an incoming X-Hub-Signature-256 header using constant-time comparison.
+
+    Parameters
+    ----------
+    raw_body:
+        Raw HTTP request body bytes as received from Meta.
+    signature_header:
+        Value of the X-Hub-Signature-256 header (e.g. 'sha256=abcdef...').
+    app_secret:
+        The Meta App Secret configured for this application.
+
+    Returns
+    -------
+    bool:
+        True if signature matches, False otherwise.
+    """
+    if not signature_header or not app_secret:
+        return False
+    header_val = signature_header.strip()
+    expected = compute_webhook_signature(raw_body, app_secret)
+    return hmac.compare_digest(header_val.lower(), expected.lower())
 
 
 # ---------------------------------------------------------------------------
@@ -213,6 +264,7 @@ class WhatsAppClient:
         owner_number: str,
         template_name: str = _TEMPLATE_NAME,
         template_lang: str = _TEMPLATE_LANG,
+        app_secret: str = "",
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self._access_token = access_token
@@ -221,7 +273,11 @@ class WhatsAppClient:
         self._owner_number = owner_number
         self._template_name = template_name
         self._template_lang = template_lang
+        self._app_secret = app_secret
         self._http_client = http_client  # may be None → lazy init
+
+    compute_signature = staticmethod(compute_webhook_signature)
+    verify_signature = staticmethod(verify_webhook_signature)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -287,7 +343,7 @@ class WhatsAppClient:
             raise ValueError(
                 f"Webhook verification failed: hub.mode must be 'subscribe', got {mode!r}"
             )
-        if token != verify_token:
+        if not (token and verify_token and hmac.compare_digest(token, verify_token)):
             raise ValueError(
                 "Webhook verification failed: hub.verify_token mismatch"
             )
@@ -462,6 +518,9 @@ class MockWhatsAppClient:
         self.sent_alerts: list[_SentAlert] = []
         self.download_calls: list[str] = []
 
+    compute_signature = staticmethod(compute_webhook_signature)
+    verify_signature = staticmethod(verify_webhook_signature)
+
     # Webhook verification mirrors the real implementation exactly.
     def verify_webhook(
         self,
@@ -475,7 +534,7 @@ class MockWhatsAppClient:
             raise ValueError(
                 f"Webhook verification failed: hub.mode must be 'subscribe', got {mode!r}"
             )
-        if token != verify_token:
+        if not (token and verify_token and hmac.compare_digest(token, verify_token)):
             raise ValueError(
                 "Webhook verification failed: hub.verify_token mismatch"
             )
