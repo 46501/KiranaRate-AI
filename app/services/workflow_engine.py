@@ -261,6 +261,14 @@ class WorkflowEngine:
                     event.sender,
                 )
                 inserted_ids.append(event.bill_id)
+
+                # ── Dispatch intake acknowledgment ────────────────────────
+                if hasattr(self._whatsapp, "send_text_message") and event.sender and event.sender != "web-admin":
+                    try:
+                        ack_text = f"KiranaIQ: Bill image received and queued for AI scanning. Reference ID: {event.bill_id}"
+                        await self._whatsapp.send_text_message(event.sender, ack_text)
+                    except Exception as ack_err:
+                        logger.warning("Could not dispatch intake ack to %s: %s", event.sender, ack_err)
             except Exception:
                 logger.exception(
                     "Failed to insert bill bill_id=%r; skipping.",
@@ -450,12 +458,30 @@ class WorkflowEngine:
                 n_lines,
             )
 
+            # ── Dispatch scan complete status notification ────────────
+            if hasattr(self._whatsapp, "send_text_message") and bill.sender and bill.sender != "web-admin":
+                try:
+                    supp_name = scan_result.supplier_raw or "Supplier"
+                    total_str = f" of Rs {scan_result.invoice_total}" if scan_result.invoice_total else ""
+                    scan_msg = f"KiranaIQ: Bill from {supp_name}{total_str} scanned ({n_lines} items extracted). Ready for verification on store dashboard."
+                    await self._whatsapp.send_text_message(bill.sender, scan_msg)
+                except Exception as scan_notify_err:
+                    logger.warning("Could not dispatch scan complete notification to %s: %s", bill.sender, scan_notify_err)
+
         except Exception as exc:
             safe_err = sanitize_user_facing_error(str(exc))
             error_msg = f"Scan error: {safe_err}"
             logger.exception("Scan failed for bill_id=%r: %s", bill_id, safe_err)
             # Record the error in notes; leave bill in SCANNING state
             self._store.update_bill(bill_id, notes=error_msg)
+
+            # ── Dispatch scan failure notification ────────────────────
+            if hasattr(self._whatsapp, "send_text_message") and bill.sender and bill.sender != "web-admin":
+                try:
+                    err_notify = f"KiranaIQ: Issue reading bill image ({safe_err}). Please check receipt clarity or retry on dashboard."
+                    await self._whatsapp.send_text_message(bill.sender, err_notify)
+                except Exception as scan_err_notify:
+                    logger.warning("Could not dispatch scan error notification to %s: %s", bill.sender, scan_err_notify)
 
         return bill_id
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import hmac
 import json
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -31,8 +32,18 @@ from app.models import (
     CostBasis,
     HeaderVerified,
     Reviewed,
+    User,
 )
-from app.services.auth import generate_csrf_token, hash_password, verify_csrf_token, verify_password
+from app.services.auth import (
+    generate_csrf_token,
+    hash_password,
+    validate_email_format,
+    validate_password_strength,
+    validate_username,
+    verify_csrf_token,
+    verify_password,
+)
+from app.storage.base import BaseStore
 from app.services.security import (
     check_rate_limit,
     get_client_ip,
@@ -316,6 +327,10 @@ def _get_or_create_csrf_token(request: Request) -> str:
 async def ui_login_page(request: Request, next: Optional[str] = None):
     """Render dashboard login form with rate limiting."""
     cfg: Settings = getattr(request.app.state, "settings", settings)
+    store: Optional[BaseStore] = getattr(request.app.state, "store", None)
+    allow_reg = (store.count_users() == 0) if store else False
+    msg = request.query_params.get("msg")
+
     try:
         check_rate_limit(
             request,
@@ -327,7 +342,7 @@ async def ui_login_page(request: Request, next: Optional[str] = None):
         return templates.TemplateResponse(
             request=request,
             name="login.html",
-            context={"csrf_token": "", "next_url": next, "error": exc.detail},
+            context={"csrf_token": "", "next_url": next, "error": exc.detail, "allow_registration": allow_reg, "message": msg},
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             headers={"Retry-After": exc.headers.get("Retry-After", "60") if exc.headers else "60"},
         )
@@ -338,7 +353,7 @@ async def ui_login_page(request: Request, next: Optional[str] = None):
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={"csrf_token": csrf_token, "next_url": next, "error": None},
+        context={"csrf_token": csrf_token, "next_url": next, "error": None, "allow_registration": allow_reg, "message": msg},
     )
 
 
@@ -352,6 +367,8 @@ async def ui_login_submit(
 ):
     """Process dashboard login credentials, enforce brute-force protection, and set cookie."""
     cfg: Settings = getattr(request.app.state, "settings", settings)
+    store: Optional[BaseStore] = getattr(request.app.state, "store", None)
+    allow_reg = (store.count_users() == 0) if store else False
     client_ip = get_client_ip(request)
     lockout_key = f"{username.strip().lower()}:{client_ip}"
 
@@ -372,6 +389,7 @@ async def ui_login_submit(
                 "next_url": next,
                 "error": exc.detail,
                 "username": username,
+                "allow_registration": allow_reg,
             },
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             headers={"Retry-After": exc.headers.get("Retry-After", "60") if exc.headers else "60"},
@@ -389,6 +407,7 @@ async def ui_login_submit(
                 "next_url": next,
                 "error": f"Account temporarily locked due to repeated failed login attempts. Please retry in {retry_after} seconds.",
                 "username": username,
+                "allow_registration": allow_reg,
             },
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             headers={"Retry-After": str(retry_after)},
@@ -405,15 +424,31 @@ async def ui_login_submit(
                 "next_url": next,
                 "error": "Invalid or expired CSRF token",
                 "username": username,
+                "allow_registration": allow_reg,
             },
             status_code=status.HTTP_403_FORBIDDEN,
         )
 
     # 4. Credentials validation
-    expected_username = cfg.dashboard_username or "admin"
-    expected_cred = cfg.dashboard_password_hash or cfg.dashboard_password
-    valid_user = hmac.compare_digest(username.strip(), expected_username.strip())
-    valid_pass = verify_password(password, expected_cred) if expected_cred else False
+    db_user = store.get_user_by_identifier(username.strip()) if store else None
+
+    valid_user = False
+    valid_pass = False
+    authenticated_username = username.strip()
+    user_role = "admin"
+
+    if db_user:
+        valid_user = True
+        valid_pass = verify_password(password, db_user.password_hash)
+        authenticated_username = db_user.username
+        user_role = db_user.role
+    else:
+        # Fallback to config settings (for existing deployments / test suites)
+        expected_username = cfg.dashboard_username or "admin"
+        expected_cred = cfg.dashboard_password_hash or cfg.dashboard_password
+        valid_user = hmac.compare_digest(username.strip(), expected_username.strip())
+        valid_pass = verify_password(password, expected_cred) if expected_cred else False
+        authenticated_username = expected_username.strip()
 
     if not (valid_user and valid_pass):
         is_now_locked, retry_secs = login_tracker.record_failure(
@@ -439,6 +474,7 @@ async def ui_login_submit(
                 "next_url": next,
                 "error": err_msg,
                 "username": username,
+                "allow_registration": allow_reg,
             },
             status_code=status_code,
             headers=headers,
@@ -449,13 +485,201 @@ async def ui_login_submit(
 
     # Prevent session fixation: clear previous session completely before storing user state
     request.session.clear()
-    request.session["authenticated_user"] = username.strip()
+    request.session["authenticated_user"] = authenticated_username
+    request.session["user_role"] = user_role
     request.session["csrf_token"] = generate_csrf_token()
     request.session["login_time"] = datetime.now(timezone.utc).isoformat()
-    logger.info("Successful dashboard login for username=%r", username)
+    logger.info("Successful dashboard login for username=%r (role=%s)", authenticated_username, user_role)
 
     target = next if (next and next.startswith("/") and not next.startswith("//")) else "/ui/bills"
     return RedirectResponse(url=target, status_code=status.HTTP_303_SEE_OTHER)
+
+
+@app.get("/ui/register", response_class=HTMLResponse)
+async def ui_register_page(request: Request):
+    """
+    Render first-time setup registration page.
+    If an admin user already exists, registration is locked and user is redirected to login.
+    """
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    store: Optional[BaseStore] = getattr(request.app.state, "store", None)
+
+    try:
+        check_rate_limit(
+            request,
+            scope="register",
+            max_requests=cfg.rate_limit_login_per_minute * 2,
+            enabled=cfg.rate_limit_enabled,
+        )
+    except HTTPException as exc:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={"csrf_token": "", "error": exc.detail},
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": exc.headers.get("Retry-After", "60") if exc.headers else "60"},
+        )
+
+    # If an admin already exists, close registration and redirect to login
+    if store and store.count_users() > 0:
+        return RedirectResponse(
+            url="/ui/login?msg=Registration+is+closed.+An+admin+account+already+exists.",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    if _get_session_user(request):
+        return RedirectResponse(url="/ui/bills", status_code=status.HTTP_303_SEE_OTHER)
+
+    csrf_token = _get_or_create_csrf_token(request)
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={"csrf_token": csrf_token, "error": None},
+    )
+
+
+@app.post("/ui/register", response_class=HTMLResponse)
+async def ui_register_submit(
+    request: Request,
+    username: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    csrf_token: str = Form(""),
+):
+    """
+    Create the first administrative account during first-time setup.
+    Guarantees:
+    - Only allowed when user count == 0.
+    - Subsequent registration is strictly rejected with 403 Forbidden.
+    - Password strength, email, and username validation.
+    - Passwords securely hashed with PBKDF2-HMAC-SHA256.
+    """
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    store: Optional[BaseStore] = getattr(request.app.state, "store", None)
+
+    # 1. Enforce rate limiting
+    try:
+        check_rate_limit(
+            request,
+            scope="register",
+            max_requests=cfg.rate_limit_login_per_minute,
+            enabled=cfg.rate_limit_enabled,
+        )
+    except HTTPException as exc:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "csrf_token": _get_or_create_csrf_token(request),
+                "error": exc.detail,
+                "username": username,
+                "email": email,
+            },
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            headers={"Retry-After": exc.headers.get("Retry-After", "60") if exc.headers else "60"},
+        )
+
+    # 2. Strict check: registration only allowed when 0 users exist
+    if store and store.count_users() > 0:
+        logger.warning("Attempted registration when admin already exists from %s", get_client_ip(request))
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is disabled because an administrator account already exists.",
+        )
+
+    # 3. Anti-CSRF verification
+    session_csrf = request.session.get("csrf_token") if hasattr(request, "session") else None
+    if not verify_csrf_token(session_csrf, csrf_token):
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={
+                "csrf_token": _get_or_create_csrf_token(request),
+                "error": "Invalid or expired CSRF token. Please refresh and try again.",
+                "username": username,
+                "email": email,
+            },
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    # 4. Form inputs validation
+    valid_u, u_err = validate_username(username)
+    if not valid_u:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={"csrf_token": _get_or_create_csrf_token(request), "error": u_err, "username": username, "email": email},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    valid_e, e_err = validate_email_format(email)
+    if not valid_e:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={"csrf_token": _get_or_create_csrf_token(request), "error": e_err, "username": username, "email": email},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if password != confirm_password:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={"csrf_token": _get_or_create_csrf_token(request), "error": "Passwords do not match.", "username": username, "email": email},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    valid_p, p_err = validate_password_strength(password)
+    if not valid_p:
+        return templates.TemplateResponse(
+            request=request,
+            name="register.html",
+            context={"csrf_token": _get_or_create_csrf_token(request), "error": p_err, "username": username, "email": email},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # 5. Check uniqueness
+    if store:
+        if store.get_user_by_username(username.strip()):
+            return templates.TemplateResponse(
+                request=request,
+                name="register.html",
+                context={"csrf_token": _get_or_create_csrf_token(request), "error": "Username is already registered.", "username": username, "email": email},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        if store.get_user_by_email(email.strip()):
+            return templates.TemplateResponse(
+                request=request,
+                name="register.html",
+                context={"csrf_token": _get_or_create_csrf_token(request), "error": "Email address is already registered.", "username": username, "email": email},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+    # 6. Securely hash password and persist first admin account
+    p_hash = hash_password(password)
+    new_user = User(
+        user_id=f"usr_{secrets.token_hex(8)}",
+        username=username.strip(),
+        email=email.strip().lower(),
+        password_hash=p_hash,
+        role="admin",
+    )
+    if store:
+        store.insert_user(new_user)
+        logger.info("Successfully registered first admin user: username=%r, email=%r", new_user.username, new_user.email)
+
+    # 7. Establish authenticated session
+    request.session.clear()
+    request.session["authenticated_user"] = new_user.username
+    request.session["user_role"] = new_user.role
+    request.session["csrf_token"] = generate_csrf_token()
+    request.session["login_time"] = datetime.now(timezone.utc).isoformat()
+
+    return RedirectResponse(
+        url="/ui/bills?msg=Welcome+to+KiranaIQ!+Administrator+account+successfully+created.",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 @app.get("/ui/logout")
@@ -847,8 +1071,17 @@ async def ui_approve_bill(
         reason=None,
     )
 
+    try:
+        engine: WorkflowEngine = request.app.state.engine
+        await engine.run_post_worker()
+        await engine.run_alert_worker()
+        msg = f"Bill+{bill_id}+successfully+approved+and+posted+to+purchase+ledger!"
+    except Exception as exc:
+        logger.warning("Auto post worker failed after approval: %s", exc)
+        msg = f"Bill+{bill_id}+successfully+approved!+Ready+for+posting."
+
     return RedirectResponse(
-        url=f"/ui/bills/{bill_id}?msg=Bill+successfully+approved!+Ready+for+posting.",
+        url=f"/ui/bills/{bill_id}?msg={msg}",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 

@@ -22,6 +22,7 @@ from app.models import (
     Purchase,
     ReviewLine,
     Supplier,
+    User,
 )
 
 
@@ -267,3 +268,31 @@ class BaseStore(ABC):
         Update arbitrary fields on an existing Alert.
         Raises if ``alert_id`` does not exist.
         """
+
+    # ------------------------------------------------------------------
+    # Users & Authentication
+    # ------------------------------------------------------------------
+
+    def insert_user(self, user: User) -> None:
+        """Persist a new User record."""
+        pass
+
+    def get_user_by_username(self, username: str) -> Optional[User]:
+        """Return User by username, or None if not found."""
+        return None
+
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        """Return User by email, or None if not found."""
+        return None
+
+    def get_user_by_identifier(self, identifier: str) -> Optional[User]:
+        """Return User matching either username or email, or None if not found."""
+        return None
+
+    def count_users(self) -> int:
+        """Return total number of registered users."""
+        return 0
+
+    def list_users(self) -> list[User]:
+        """Return all registered users."""
+        return []

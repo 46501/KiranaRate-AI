@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -43,6 +43,7 @@ from app.models import (
     ReviewLine,
     Supplier,
     SupplierActive,
+    User,
 )
 from app.storage.base import BaseStore
 
@@ -200,6 +201,18 @@ def _row_to_alert(row: sqlite3.Row) -> Alert:
         attempted_at=_str_to_dt(row["attempted_at"]),
         sent_at=_str_to_dt(row["sent_at"]),
         wamid=row["wamid"],
+    )
+
+
+def _row_to_user(row: sqlite3.Row) -> User:
+    created = _str_to_dt(row["created_at"]) or datetime.now(timezone.utc)
+    return User(
+        user_id=row["user_id"],
+        username=row["username"],
+        email=row["email"],
+        password_hash=row["password_hash"],
+        role=row["role"] if "role" in row.keys() else "admin",
+        created_at=created,
     )
 
 
@@ -422,6 +435,20 @@ class SQLiteStore(BaseStore):
 
                 CREATE INDEX IF NOT EXISTS idx_alerts_status_created
                     ON alerts (status, created_at);
+
+                CREATE TABLE IF NOT EXISTS users (
+                    user_id       TEXT PRIMARY KEY,
+                    username      TEXT UNIQUE NOT NULL,
+                    email         TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    role          TEXT NOT NULL DEFAULT 'admin',
+                    created_at    TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_users_username
+                    ON users (username);
+                CREATE INDEX IF NOT EXISTS idx_users_email
+                    ON users (email);
             """)
 
     def seed_demo_data(self) -> None:
@@ -1018,3 +1045,75 @@ class SQLiteStore(BaseStore):
             cur = conn.execute(sql, params)
         if cur.rowcount == 0:
             raise KeyError(f"Alert not found: {alert_id!r}")
+
+    # ------------------------------------------------------------------
+    # Users & Authentication
+    # ------------------------------------------------------------------
+
+    def insert_user(self, user: User) -> None:
+        """Persist a new User record into the users table."""
+        conn = self._get_conn()
+        with conn:
+            conn.execute(
+                """
+                INSERT INTO users (user_id, username, email, password_hash, role, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    user.user_id,
+                    user.username.strip().lower(),
+                    user.email.strip().lower(),
+                    user.password_hash,
+                    user.role,
+                    _dt_to_str(user.created_at) or datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+
+    def get_user_by_username(self, username: str) -> Optional[User]:
+        """Return User by exact (case-insensitive) username, or None."""
+        if not username:
+            return None
+        conn = self._get_conn()
+        cur = conn.execute(
+            "SELECT * FROM users WHERE lower(username) = lower(?)",
+            (username.strip(),),
+        )
+        row = cur.fetchone()
+        return _row_to_user(row) if row else None
+
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        """Return User by exact (case-insensitive) email, or None."""
+        if not email:
+            return None
+        conn = self._get_conn()
+        cur = conn.execute(
+            "SELECT * FROM users WHERE lower(email) = lower(?)",
+            (email.strip(),),
+        )
+        row = cur.fetchone()
+        return _row_to_user(row) if row else None
+
+    def get_user_by_identifier(self, identifier: str) -> Optional[User]:
+        """Return User matching either username or email (case-insensitive), or None."""
+        if not identifier:
+            return None
+        clean_id = identifier.strip().lower()
+        conn = self._get_conn()
+        cur = conn.execute(
+            "SELECT * FROM users WHERE lower(username) = ? OR lower(email) = ?",
+            (clean_id, clean_id),
+        )
+        row = cur.fetchone()
+        return _row_to_user(row) if row else None
+
+    def count_users(self) -> int:
+        """Return total count of registered users."""
+        conn = self._get_conn()
+        cur = conn.execute("SELECT count(*) FROM users")
+        return int(cur.fetchone()[0])
+
+    def list_users(self) -> list[User]:
+        """Return all registered users ordered by creation date ascending."""
+        conn = self._get_conn()
+        cur = conn.execute("SELECT * FROM users ORDER BY created_at ASC")
+        return [_row_to_user(row) for row in cur.fetchall()]

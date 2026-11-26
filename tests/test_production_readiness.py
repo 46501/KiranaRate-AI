@@ -369,12 +369,46 @@ class TestWhatsAppProductionIntake:
             assert payload["to"] == "919876543210"
             assert payload["type"] == "text"
             assert payload["text"]["body"] == "Test acknowledgment"
-            assert "105938472910482/messages" in call_url
-            payload = mock_post.call_args[1]["json"]
-            assert payload["messaging_product"] == "whatsapp"
-            assert payload["to"] == "919876543210"
-            assert payload["type"] == "text"
-            assert payload["text"]["body"] == "Test acknowledgment"
+
+    @pytest.mark.asyncio
+    async def test_whatsapp_intake_acknowledges_sender(self, engine, mock_whatsapp, sample_webhook_factory):
+        """When an inbound bill is received, an immediate acknowledgment text is sent to the sender."""
+        payload = sample_webhook_factory(
+            message_id="wamid.ACK_TEST_001",
+            sender="919876543210",
+        )
+        inserted = await engine.run_intake(payload)
+        assert len(inserted) == 1
+        assert inserted[0] == "wamid.ACK_TEST_001"
+
+        # Verify outgoing text message
+        assert len(mock_whatsapp.sent_texts) == 1
+        ack_record = mock_whatsapp.sent_texts[0]
+        assert ack_record.to_number == "919876543210"
+        assert "queued for AI scanning" in ack_record.text
+        assert "wamid.ACK_TEST_001" in ack_record.text
+
+    @pytest.mark.asyncio
+    async def test_whatsapp_scan_worker_notifies_sender_on_completion(self, engine, store, make_bill, mock_whatsapp):
+        """When AI scan completes, a status notification text is dispatched to the merchant sender."""
+        bill = make_bill(
+            bill_id="bill_scan_notify_001",
+            sender="919876543210",
+            status=BillStatus.QUEUED,
+            mime_type="image/jpeg",
+        )
+        # Clear any prior sent texts
+        mock_whatsapp.sent_texts.clear()
+
+        processed_id = await engine.run_scan_worker()
+        assert processed_id == "bill_scan_notify_001"
+
+        # Verify outgoing scan status notification
+        assert len(mock_whatsapp.sent_texts) == 1
+        status_record = mock_whatsapp.sent_texts[0]
+        assert status_record.to_number == "919876543210"
+        assert "scanned" in status_record.text
+        assert "Awaiting verification" in status_record.text or "dashboard" in status_record.text
 
 
 # ---------------------------------------------------------------------------

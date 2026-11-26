@@ -152,13 +152,20 @@
       </div>
       {% endif %}
 
+      {% if message %}
+      <div style="background-color: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 18px; display: flex; align-items: center; gap: 8px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        <span>{{ message }}</span>
+      </div>
+      {% endif %}
+
       <form method="POST" action="/ui/login">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <input type="hidden" name="next" value="{{ next_url or '/ui/bills' }}">
 
         <div class="form-group">
-          <label class="form-label" for="username">Username</label>
-          <input class="form-input" type="text" id="username" name="username" required autofocus placeholder="admin" value="{{ username or '' }}">
+          <label class="form-label" for="username">Username or Email</label>
+          <input class="form-input" type="text" id="username" name="username" required autofocus placeholder="admin or admin@store.com" value="{{ username or '' }}">
         </div>
 
         <div class="form-group">
@@ -168,6 +175,15 @@
 
         <button type="submit" class="btn-submit">Sign In to Dashboard</button>
       </form>
+
+      {% if allow_registration %}
+      <div style="margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); text-align: center;">
+        <p style="font-size: 13px; color: var(--muted); margin-bottom: 6px;">First-time setup?</p>
+        <a href="/ui/register" style="color: var(--primary); font-weight: 600; font-size: 13px; text-decoration: none;" id="createAccountLink">
+          ✨ Create Admin Account →
+        </a>
+      </div>
+      {% endif %}
     </div>
 
     <div class="footer-note">

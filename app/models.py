@@ -15,7 +15,7 @@ scan text keep their ``Decimal`` type until the Verify pipeline converts them.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
@@ -348,3 +348,15 @@ class Alert:
 
     wamid: Optional[str] = None
     """WhatsApp message ID returned on successful delivery."""
+
+
+@dataclass
+class User:
+    """Dashboard user account for authentication."""
+
+    user_id: str
+    username: str
+    email: str
+    password_hash: str
+    role: str = "admin"
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
