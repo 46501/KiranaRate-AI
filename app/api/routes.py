@@ -106,11 +106,32 @@ def _bill_to_response(bill: Bill, lines: Optional[List[ReviewLine]] = None) -> B
 # ---------------------------------------------------------------------------
 
 @router.get("/health")
-async def health_check() -> dict:
-    """Service health endpoint."""
+async def health_check(
+    store: BaseStore = Depends(get_store),
+    settings: Settings = Depends(get_settings),
+) -> dict:
+    """Service health endpoint with database probe."""
+    db_ok = False
+    try:
+        if hasattr(store, "_get_conn"):
+            conn = store._get_conn()
+            cur = conn.execute("SELECT 1")
+            db_ok = bool(cur.fetchone())
+        else:
+            db_ok = True
+    except Exception as exc:
+        logger.error("Health check database probe failed: %s", exc)
+
     return {
-        "status": "ok",
+        "status": "ok" if db_ok else "degraded",
+        "database": "connected" if db_ok else "error",
+        "environment": settings.environment,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "model": settings.gemini_model,
+        "mock_mode": {
+            "gemini": settings.mock_gemini,
+            "whatsapp": settings.mock_whatsapp,
+        },
     }
 
 
@@ -344,6 +365,50 @@ async def approve_bill(
     return _bill_to_response(updated_bill, lines=lines)
 
 
+@router.post("/bills/{bill_id}/retry", response_model=dict)
+async def retry_bill_scan(
+    bill_id: str,
+    store: BaseStore = Depends(get_store),
+    engine: WorkflowEngine = Depends(get_engine),
+    _auth: str = Depends(require_auth),
+) -> dict:
+    """
+    Recover and retry a failed or stuck bill scan.
+    Resets status to QUEUED, clears error notes, purges prior partial review lines,
+    and triggers the scan worker.
+    """
+    bill = store.get_bill(bill_id)
+    if not bill:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Bill '{bill_id}' not found")
+
+    if bill.status not in (BillStatus.SCANNING, BillStatus.QUEUED, BillStatus.REVIEW):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot retry scan for bill in {bill.status.value} status",
+        )
+
+    # Purge any partial review lines from prior attempt to avoid duplicates
+    store.delete_review_lines(bill_id)
+
+    # Reset bill to QUEUED and clear notes
+    store.update_bill(
+        bill_id,
+        status=BillStatus.QUEUED,
+        notes=None,
+    )
+
+    # Trigger scan worker immediately
+    processed_id = await engine.run_scan_worker()
+    updated = store.get_bill(bill_id)
+
+    return {
+        "status": "ok",
+        "bill_id": bill_id,
+        "new_status": updated.status.value if updated else "UNKNOWN",
+        "message": "Bill re-queued and scan triggered",
+    }
+
+
 @router.post("/bills/{bill_id}/quick-approve", response_model=BillResponse)
 async def quick_approve_bill(
     bill_id: str,
@@ -458,7 +523,6 @@ async def reject_bill(
     updated_bill = store.get_bill(bill_id)
     lines = store.get_review_lines(bill_id)
     return _bill_to_response(updated_bill, lines=lines)
-
 
 
 # ---------------------------------------------------------------------------

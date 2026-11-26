@@ -270,6 +270,7 @@ class SQLiteStore(BaseStore):
         if conn is None:
             conn = sqlite3.connect(
                 self._db_path,
+                timeout=30.0,
                 check_same_thread=False,
                 detect_types=sqlite3.PARSE_DECLTYPES,
             )
@@ -277,8 +278,22 @@ class SQLiteStore(BaseStore):
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute("PRAGMA busy_timeout=30000")
             self._local.conn = conn
         return conn
+
+    def backup(self, dest_path: str) -> None:
+        """
+        Perform an online, crash-consistent hot backup of the SQLite database
+        using the native SQLite online backup API.
+        """
+        dest_conn = sqlite3.connect(dest_path)
+        try:
+            with dest_conn:
+                src_conn = self._get_conn()
+                src_conn.backup(dest_conn, pages=100)
+        finally:
+            dest_conn.close()
 
     def close(self) -> None:
         """Close any open SQLite connections."""

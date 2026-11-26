@@ -1319,7 +1319,7 @@
                   </span>
                 </td>
                 <td style="font-weight: 600; color: var(--text-main);">
-                  {{ b.supplier_raw or '<span style="color:#98a2b3; font-weight:normal;">Pending Scan</span>'|safe }}
+                  {{ b.supplier_raw or ('<span style="color:#dc2626; font-size:12px;" title="' ~ b.notes ~ '">⚠️ Scan Failed (Retry)</span>' if b.notes and 'error' in b.notes|lower else '<span style="color:#98a2b3; font-weight:normal;">Pending Scan</span>')|safe }}
                 </td>
                 <td>
                   {% if b.invoice_no %}
@@ -1339,6 +1339,14 @@
                 </td>
                 <td style="text-align: right; white-space: nowrap;">
                   <div style="display:inline-flex; align-items:center; gap:6px;">
+                    {% if b.status.value in ('SCANNING', 'QUEUED') or (b.notes and 'error' in b.notes|lower) %}
+                    <form action="/ui/bills/{{ b.bill_id }}/retry" method="POST" style="margin:0;">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                      <button type="submit" class="btn btn-secondary" title="Retry Gemini AI scan on this bill" style="font-size:11px; padding:3px 7px; color:#b45309; border-color:#fde68a; background:#fffbeb; font-weight:600;">
+                        🔄 Retry
+                      </button>
+                    </form>
+                    {% endif %}
                     {% if b.status.value == 'REVIEW' %}
                     <form action="/ui/bills/{{ b.bill_id }}/quick-approve" method="POST" style="margin:0;">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

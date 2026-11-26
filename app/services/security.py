@@ -11,6 +11,7 @@ Priority 3 Security Hardening Services for KiranaIQ:
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import re
 import threading
@@ -234,22 +235,77 @@ login_tracker = LoginAttemptTracker()
 
 
 # ---------------------------------------------------------------------------
-# Client IP & Rate Limiting Helpers
+# Client IP & Rate Limiting Helpers (Trusted Proxy Hardened)
 # ---------------------------------------------------------------------------
 
-def get_client_ip(request: Request) -> str:
+def is_ip_in_trusted_proxies(ip_str: str, trusted_list: List[str]) -> bool:
     """
-    Extract the effective client IP address from request headers or socket.
-    Respects standard X-Forwarded-For if deployed behind reverse proxy.
+    Check if a client IP address matches an entry in the trusted proxies list.
+    Supports individual IPv4/IPv6 addresses and CIDR subnets (e.g. 127.0.0.1, 10.0.0.0/8).
     """
+    if not ip_str or not trusted_list:
+        return False
+    try:
+        ip = ipaddress.ip_address(ip_str.strip())
+    except ValueError:
+        return False
+
+    for trusted in trusted_list:
+        trusted_clean = str(trusted).strip()
+        if not trusted_clean:
+            continue
+        try:
+            if "/" in trusted_clean:
+                net = ipaddress.ip_network(trusted_clean, strict=False)
+                if ip in net:
+                    return True
+            else:
+                if ip == ipaddress.ip_address(trusted_clean):
+                    return True
+        except ValueError:
+            if ip_str.strip() == trusted_clean:
+                return True
+
+    return False
+
+
+def get_client_ip(request: Request, trusted_proxies: Optional[List[str]] = None) -> str:
+    """
+    Extract the verified client IP address.
+
+    Security Rules:
+    1. If the direct socket peer (request.client.host) is NOT in trusted_proxies,
+       X-Forwarded-For is completely ignored to prevent IP spoofing and rate limit bypass.
+    2. If the direct peer is a trusted reverse proxy, the X-Forwarded-For chain is evaluated
+       from right-to-left. The first untrusted IP encountered is returned as the client IP.
+    3. If all IPs are trusted or no X-Forwarded-For is present, the direct peer host is returned.
+    """
+    direct_ip = request.client.host if request.client and request.client.host else "127.0.0.1"
+
+    if trusted_proxies is None:
+        cfg = getattr(request.app.state, "settings", None) if hasattr(request, "app") and hasattr(request.app, "state") else None
+        if cfg and hasattr(cfg, "trusted_proxies"):
+            trusted_proxies = cfg.trusted_proxies
+        else:
+            trusted_proxies = ["127.0.0.1", "::1"]
+
+    # Direct connection is NOT from a trusted proxy; reject X-Forwarded-For to prevent spoofing
+    if not is_ip_in_trusted_proxies(direct_ip, trusted_proxies):
+        return direct_ip
+
+    # Direct connection is from a trusted proxy; evaluate X-Forwarded-For from right to left
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
-        if client_ip:
-            return client_ip
-    if request.client and request.client.host:
-        return request.client.host
-    return "127.0.0.1"
+        parts = [p.strip() for p in forwarded.split(",") if p.strip()]
+        for ip_candidate in reversed(parts):
+            if not is_ip_in_trusted_proxies(ip_candidate, trusted_proxies):
+                try:
+                    ipaddress.ip_address(ip_candidate)
+                    return ip_candidate
+                except ValueError:
+                    continue
+
+    return direct_ip
 
 
 def check_rate_limit(
@@ -258,15 +314,16 @@ def check_rate_limit(
     max_requests: int,
     window_seconds: int = 60,
     enabled: bool = True,
+    trusted_proxies: Optional[List[str]] = None,
 ) -> None:
     """
-    Enforce rate limit for the given request and scope.
+    Enforce rate limit for the given request and scope using verified client IP.
     Raises HTTPException(429) if limit exceeded.
     """
     if not enabled or max_requests <= 0:
         return
 
-    client_ip = get_client_ip(request)
+    client_ip = get_client_ip(request, trusted_proxies=trusted_proxies)
     key = f"{scope}:{client_ip}"
     allowed, retry_after = rate_limiter.is_allowed(key, max_requests, window_seconds)
     if not allowed:

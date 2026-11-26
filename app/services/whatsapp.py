@@ -162,12 +162,13 @@ class WhatsAppWebhookParser:
                     if not isinstance(message, dict):
                         continue
 
-                    # ── 3. Only image messages ───────────────────────────────
-                    if message.get("type") != "image":
+                    # ── 3. Accept image and document messages ────────────────
+                    msg_type = message.get("type")
+                    if msg_type not in ("image", "document"):
                         logger.debug(
-                            "Skipping message id=%r: type=%r (not image)",
+                            "Skipping message id=%r: type=%r (neither image nor document)",
                             message.get("id"),
-                            message.get("type"),
+                            msg_type,
                         )
                         continue
 
@@ -184,10 +185,34 @@ class WhatsAppWebhookParser:
                         continue
 
                     # ── Extract fields ───────────────────────────────────────
-                    image = message.get("image", {})
+                    if msg_type == "image":
+                        media_obj = message.get("image", {})
+                        mime_type = media_obj.get("mime_type", "image/jpeg")
+                    else:  # document
+                        media_obj = message.get("document", {})
+                        mime_type = media_obj.get("mime_type", "application/octet-stream")
+                        filename = media_obj.get("filename", "").lower()
+                        # Resolve mime_type if sent as general document
+                        if mime_type not in ("image/jpeg", "image/png"):
+                            if filename.endswith((".jpg", ".jpeg")):
+                                mime_type = "image/jpeg"
+                            elif filename.endswith(".png"):
+                                mime_type = "image/png"
+                            else:
+                                logger.warning(
+                                    "Skipping document message id=%r: unsupported document MIME/file %r (%s)",
+                                    message.get("id"),
+                                    filename,
+                                    mime_type,
+                                )
+                                continue
+
+                    # Normalize image/jpg to image/jpeg
+                    if mime_type == "image/jpg":
+                        mime_type = "image/jpeg"
+
                     bill_id = message.get("id", "")
-                    media_id = image.get("id", "")
-                    mime_type = image.get("mime_type", "image/jpeg")
+                    media_id = media_obj.get("id", "")
 
                     try:
                         received_at = datetime.fromtimestamp(
@@ -460,6 +485,32 @@ class WhatsAppClient:
         logger.info("Template alert sent to %r wamid=%r", to_number, wamid)
         return wamid
 
+    async def send_text_message(self, to_number: str, text: str) -> str:
+        """
+        Send an outbound freeform text message via WhatsApp Cloud API.
+        Useful for acknowledgement messages and processing status updates.
+        """
+        client = self._client()
+        url = self._graph_url(self._api_version, self._phone_number_id, "messages")
+
+        body = {
+            "messaging_product": "whatsapp",
+            "to": to_number,
+            "type": "text",
+            "text": {
+                "body": text,
+            },
+        }
+
+        logger.debug("Sending text message to %r: %s", to_number, text[:60])
+        resp = await client.post(url, json=body, headers=self._auth_headers())
+        resp.raise_for_status()
+
+        resp_json: dict = resp.json()
+        wamid: str = resp_json["messages"][0]["id"]
+        logger.info("Text message sent to %r wamid=%r", to_number, wamid)
+        return wamid
+
 
 # ---------------------------------------------------------------------------
 # MockWhatsAppClient  (test double — no network I/O)
@@ -473,6 +524,14 @@ class _SentAlert:
     wamid: str
     template_name: str = _TEMPLATE_NAME
     template_lang: str = _TEMPLATE_LANG
+
+
+@dataclass
+class _SentText:
+    """Record of a send_text_message call, stored for test assertions."""
+    to_number: str
+    text: str
+    wamid: str
 
 
 class MockWhatsAppClient:
@@ -516,6 +575,7 @@ class MockWhatsAppClient:
 
         # Test-assertion surfaces
         self.sent_alerts: list[_SentAlert] = []
+        self.sent_texts: list[_SentText] = []
         self.download_calls: list[str] = []
 
     compute_signature = staticmethod(compute_webhook_signature)
@@ -563,4 +623,12 @@ class MockWhatsAppClient:
             len(params),
             wamid,
         )
+        return wamid
+
+    async def send_text_message(self, to_number: str, text: str) -> str:
+        """Record the call and return a deterministic-looking fake text wamid."""
+        wamid = "mock-wamid-txt-" + uuid4().hex[:8]
+        record = _SentText(to_number=to_number, text=text, wamid=wamid)
+        self.sent_texts.append(record)
+        logger.debug("[Mock] send_text_message to=%r text=%r wamid=%r", to_number, text[:60], wamid)
         return wamid

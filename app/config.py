@@ -34,6 +34,30 @@ class Settings(BaseSettings):
     )
 
     # ------------------------------------------------------------------
+    # Environment & Deployment
+    # ------------------------------------------------------------------
+
+    environment: str = "development"
+    """Application environment: 'development', 'staging', or 'production'."""
+
+    debug: bool = False
+    """Debug mode flag; must be False in production."""
+
+    trusted_proxies: List[str] = Field(
+        default_factory=lambda: ["127.0.0.1", "::1"],
+        description="List of trusted reverse proxy IP addresses or CIDR subnets.",
+    )
+
+    @field_validator("trusted_proxies", mode="before")
+    @classmethod
+    def _parse_trusted_proxies(cls, v: object) -> List[str]:
+        if isinstance(v, list):
+            return [str(x).strip() for x in v if str(x).strip()]
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return ["127.0.0.1", "::1"]
+
+    # ------------------------------------------------------------------
     # WhatsApp Cloud API
     # ------------------------------------------------------------------
 

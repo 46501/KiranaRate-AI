@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -47,7 +48,9 @@
       --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -161,23 +164,66 @@
       border-radius: 50%;
     }
 
-    .badge-QUEUED { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
-    .badge-QUEUED .status-dot { background: #94a3b8; }
+    .badge-QUEUED {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #e2e8f0;
+    }
 
-    .badge-SCANNING { background: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
-    .badge-SCANNING .status-dot { background: #0284c7; box-shadow: 0 0 4px #0284c7; }
+    .badge-QUEUED .status-dot {
+      background: #94a3b8;
+    }
 
-    .badge-REVIEW { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-    .badge-REVIEW .status-dot { background: #d97706; }
+    .badge-SCANNING {
+      background: #f0f9ff;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+    }
 
-    .badge-APPROVED { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
-    .badge-APPROVED .status-dot { background: #10b981; }
+    .badge-SCANNING .status-dot {
+      background: #0284c7;
+      box-shadow: 0 0 4px #0284c7;
+    }
 
-    .badge-POSTED { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
-    .badge-POSTED .status-dot { background: #16a34a; }
+    .badge-REVIEW {
+      background: #fffbeb;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
 
-    .badge-REJECTED { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-    .badge-REJECTED .status-dot { background: #dc2626; }
+    .badge-REVIEW .status-dot {
+      background: #d97706;
+    }
+
+    .badge-APPROVED {
+      background: #ecfdf5;
+      color: #047857;
+      border: 1px solid #a7f3d0;
+    }
+
+    .badge-APPROVED .status-dot {
+      background: #10b981;
+    }
+
+    .badge-POSTED {
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+
+    .badge-POSTED .status-dot {
+      background: #16a34a;
+    }
+
+    .badge-REJECTED {
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    .badge-REJECTED .status-dot {
+      background: #dc2626;
+    }
 
     /* FLASH BANNERS */
     .banner-toast {
@@ -302,7 +348,7 @@
       max-width: 100%;
       height: auto;
       border-radius: 4px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       transition: transform 0.2s ease;
     }
 
@@ -692,6 +738,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="app-wrapper">
 
@@ -704,24 +751,31 @@
         <div class="heading-row" style="margin-top: 4px;">
           <h1>Bill Review</h1>
           <span class="bill-id-tag">{{ bill.bill_id }}</span>
-          <span style="font-size:11px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:2px 8px; border-radius:12px; font-weight:600; font-family:var(--font-mono);">Single Store Pilot · INR · EX_GST</span>
+          <span
+            style="font-size:11px; background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; padding:2px 8px; border-radius:12px; font-weight:600; font-family:var(--font-mono);">Single
+            Store Pilot · INR · EX_GST</span>
         </div>
         <div class="meta-bar">
           <span class="meta-item">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z">
+              </path>
             </svg>
             Received: {{ bill.received_at.strftime('%d-%b-%Y %H:%M IST') if bill.received_at else '-' }}
           </span>
           <span class="meta-item">
             <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" style="color: #16a34a;">
-              <path d="M12.031 2C6.496 2 2 6.496 2 12.031c0 1.953.563 3.773 1.531 5.313L2 22l4.828-1.5a10.015 10.015 0 005.203 1.531c5.535 0 10.031-4.496 10.031-10.031S17.566 2 12.031 2z"></path>
+              <path
+                d="M12.031 2C6.496 2 2 6.496 2 12.031c0 1.953.563 3.773 1.531 5.313L2 22l4.828-1.5a10.015 10.015 0 005.203 1.531c5.535 0 10.031-4.496 10.031-10.031S17.566 2 12.031 2z">
+              </path>
             </svg>
             Sender: {{ bill.sender }}
           </span>
           <span class="meta-item">
             <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z">
+              </path>
             </svg>
             Media: {{ bill.media_id or '-' }} ({{ bill.mime_type or 'image/jpeg' }})
           </span>
@@ -734,7 +788,9 @@
           Status: {{ bill.status.value }}
         </span>
         {% if current_user %}
-        <a href="/ui/logout" class="btn" style="background:#fef2f2; border:1px solid #fecaca; color:#dc2626; text-decoration:none; font-weight:600; padding:6px 12px; border-radius:6px; font-size:12px;" title="Sign out of KiranaIQ session">Sign Out</a>
+        <a href="/ui/logout" class="btn"
+          style="background:#fef2f2; border:1px solid #fecaca; color:#dc2626; text-decoration:none; font-weight:600; padding:6px 12px; border-radius:6px; font-size:12px;"
+          title="Sign out of KiranaIQ session">Sign Out</a>
         {% endif %}
       </div>
     </header>
@@ -748,8 +804,11 @@
 
     {% if bill.reason %}
     <div class="banner-danger">
-      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+        style="flex-shrink:0;">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+        </path>
       </svg>
       <div>
         <strong>Verification Failure / Reason:</strong> {{ bill.reason }}
@@ -758,13 +817,21 @@
     {% endif %}
 
     {% if bill.notes %}
-    <div class="banner-warning">
-      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-      </svg>
-      <div>
-        <strong>Gemini AI Scan Notes:</strong> {{ bill.notes }}
+    <div class="banner-warning" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <div>
+          <strong>Gemini AI Scan Notes:</strong> {{ bill.notes }}
+        </div>
       </div>
+      <form action="/ui/bills/{{ bill.bill_id }}/retry" method="POST" style="margin:0; flex-shrink:0;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="btn btn-secondary" style="font-size:12px; padding:6px 12px; background:#ffffff; color:#b45309; border-color:#fcd34d; font-weight:600;">
+          🔄 Retry AI Scan
+        </button>
+      </form>
     </div>
     {% endif %}
 
@@ -778,8 +845,11 @@
         <div class="panel-card">
           <div class="panel-header">
             <h2 class="panel-title">
-              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--primary);">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+                style="color:var(--primary);">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                </path>
               </svg>
               Original Purchase Invoice
             </h2>
@@ -807,7 +877,8 @@
               <div>
                 <div class="digital-inv-vendor">{{ bill.supplier_raw or 'Pending Supplier Identification' }}</div>
                 <div class="digital-inv-meta">
-                  Invoice No: <strong>{{ bill.invoice_no or '-' }}</strong> · Date: <strong>{{ bill.invoice_date or '-' }}</strong>
+                  Invoice No: <strong>{{ bill.invoice_no or '-' }}</strong> · Date: <strong>{{ bill.invoice_date or '-'
+                    }}</strong>
                 </div>
               </div>
               <div class="digital-inv-total">
@@ -906,7 +977,8 @@
             <div class="form-grid-2">
               <div class="form-group">
                 <label>Reviewer Name <span class="req">*</span></label>
-                <input type="text" name="reviewer" value="{{ bill.reviewer or 'store_manager' }}" required placeholder="e.g. store_manager">
+                <input type="text" name="reviewer" value="{{ bill.reviewer or 'store_manager' }}" required
+                  placeholder="e.g. store_manager">
               </div>
 
               <div class="form-group">
@@ -914,7 +986,7 @@
                 <select name="supplier_id" required>
                   <option value="">-- Choose Active Supplier --</option>
                   {% for s in suppliers %}
-                  <option value="{{ s.supplier_id }}" {% if bill.supplier_id == s.supplier_id %}selected{% endif %}>
+                  <option value="{{ s.supplier_id }}" {% if bill.supplier_id==s.supplier_id %}selected{% endif %}>
                     {{ s.supplier_name }} ({{ s.supplier_id }})
                   </option>
                   {% endfor %}
@@ -925,7 +997,8 @@
             <div class="form-grid-2">
               <div class="form-group">
                 <label>Invoice Number <span class="req">*</span></label>
-                <input type="text" name="invoice_no" value="{{ bill.invoice_no or '' }}" required placeholder="e.g. INV-2026-001">
+                <input type="text" name="invoice_no" value="{{ bill.invoice_no or '' }}" required
+                  placeholder="e.g. INV-2026-001">
               </div>
 
               <div class="form-group">
@@ -937,14 +1010,18 @@
             <div class="form-grid-2">
               <div class="form-group">
                 <label>Verified Net Total (INR) <span class="req">*</span></label>
-                <input type="text" name="verified_net_total" id="verifiedNetTotal" value="{{ bill.verified_net_total or bill.invoice_total or '' }}" required placeholder="e.g. 500.00" style="font-family: var(--font-mono); font-weight: 600;">
+                <input type="text" name="verified_net_total" id="verifiedNetTotal"
+                  value="{{ bill.verified_net_total or bill.invoice_total or '' }}" required placeholder="e.g. 500.00"
+                  style="font-family: var(--font-mono); font-weight: 600;">
               </div>
 
               <div class="form-group">
                 <label>Header Verified <span class="req">*</span></label>
                 <select name="header_verified" required>
-                  <option value="YES" {% if bill.header_verified and bill.header_verified.value == 'YES' %}selected{% endif %}>YES (Confirmed from Image)</option>
-                  <option value="NO" {% if not bill.header_verified or bill.header_verified.value == 'NO' %}selected{% endif %}>NO (Unverified)</option>
+                  <option value="YES" {% if bill.header_verified and bill.header_verified.value=='YES' %}selected{%
+                    endif %}>YES (Confirmed from Image)</option>
+                  <option value="NO" {% if not bill.header_verified or bill.header_verified.value=='NO' %}selected{%
+                    endif %}>NO (Unverified)</option>
                 </select>
               </div>
             </div>
@@ -980,11 +1057,13 @@
                     {% if suggestions and suggestions.get(ln.review_id) %}
                     {% set sug = suggestions.get(ln.review_id) %}
                     {% if sug.confidence >= 75 %}
-                    <span style="font-size:11px; font-weight:600; padding:2px 7px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;">
+                    <span
+                      style="font-size:11px; font-weight:600; padding:2px 7px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;">
                       ✨ {{ sug.confidence }}% Match
                     </span>
                     {% else %}
-                    <span style="font-size:11px; font-weight:600; padding:2px 7px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe;">
+                    <span
+                      style="font-size:11px; font-weight:600; padding:2px 7px; border-radius:10px; display:inline-flex; align-items:center; gap:3px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe;">
                       ✨ {{ sug.confidence }}% Match
                     </span>
                     {% endif %}
@@ -993,16 +1072,19 @@
                   <select name="sku_{{ ln.review_id }}" id="sku_select_{{ ln.review_id }}" required>
                     <option value="">-- Select Canonical SKU --</option>
                     {% for p in products %}
-                    <option value="{{ p.sku }}" {% if ln.sku == p.sku %}selected{% endif %}>
+                    <option value="{{ p.sku }}" {% if ln.sku==p.sku %}selected{% endif %}>
                       {{ p.sku }} ({{ p.product_name }})
                     </option>
                     {% endfor %}
                   </select>
                   {% if suggestions and suggestions.get(ln.review_id) and not ln.sku %}
                   {% set sug = suggestions[ln.review_id] %}
-                  <div style="font-size:11.5px; color:var(--text-muted); margin-top:5px; display:flex; align-items:center; justify-content:space-between; gap:6px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:4px 8px;">
+                  <div
+                    style="font-size:11.5px; color:var(--text-muted); margin-top:5px; display:flex; align-items:center; justify-content:space-between; gap:6px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:4px 8px;">
                     <span>AI Suggestion: <strong>{{ sug.sku }}</strong> ({{ sug.confidence }}% match)</span>
-                    <button type="button" onclick="document.getElementById('sku_select_{{ ln.review_id }}').value='{{ sug.sku }}'; this.parentElement.style.display='none'; updateReconciliation();" style="background:#2563eb; color:#fff; border:none; padding:2px 8px; border-radius:4px; font-size:10.5px; font-weight:600; cursor:pointer;">
+                    <button type="button"
+                      onclick="document.getElementById('sku_select_{{ ln.review_id }}').value='{{ sug.sku }}'; this.parentElement.style.display='none'; updateReconciliation();"
+                      style="background:#2563eb; color:#fff; border:none; padding:2px 8px; border-radius:4px; font-size:10.5px; font-weight:600; cursor:pointer;">
                       Apply Suggestion
                     </button>
                   </div>
@@ -1011,18 +1093,24 @@
 
                 <div class="form-group">
                   <label>Units <span class="req">*</span></label>
-                  <input type="number" class="line-units" name="units_{{ ln.review_id }}" value="{{ ln.received_units or ln.quantity_raw or '1' }}" min="1" required style="font-family: var(--font-mono); text-align: right;">
+                  <input type="number" class="line-units" name="units_{{ ln.review_id }}"
+                    value="{{ ln.received_units or ln.quantity_raw or '1' }}" min="1" required
+                    style="font-family: var(--font-mono); text-align: right;">
                 </div>
 
                 <div class="form-group">
                   <label>Net Amount (₹) <span class="req">*</span></label>
-                  <input type="text" class="line-amt" name="amt_{{ ln.review_id }}" value="{{ ln.net_amount or ln.line_total_raw or '' }}" required style="font-family: var(--font-mono); text-align: right; font-weight: 600;">
+                  <input type="text" class="line-amt" name="amt_{{ ln.review_id }}"
+                    value="{{ ln.net_amount or ln.line_total_raw or '' }}" required
+                    style="font-family: var(--font-mono); text-align: right; font-weight: 600;">
                 </div>
               </div>
 
               <div class="item-review-check">
-                <input type="checkbox" id="rev_{{ ln.review_id }}" name="reviewed_{{ ln.review_id }}" value="YES" {% if ln.reviewed.value == 'YES' %}checked{% endif %}>
-                <label for="rev_{{ ln.review_id }}" style="font-size: 12.5px; text-transform: none; font-weight: 500; cursor: pointer;">
+                <input type="checkbox" id="rev_{{ ln.review_id }}" name="reviewed_{{ ln.review_id }}" value="YES" {% if
+                  ln.reviewed.value=='YES' %}checked{% endif %}>
+                <label for="rev_{{ ln.review_id }}"
+                  style="font-size: 12.5px; text-transform: none; font-weight: 500; cursor: pointer;">
                   Mark item verified & mapped
                 </label>
               </div>
@@ -1046,13 +1134,15 @@
               </div>
               <div class="recon-col">
                 <span class="recon-lbl">Verified Total</span>
-                <span class="recon-val" id="verifiedTotalDisplay">₹{{ bill.verified_net_total or bill.invoice_total or '0.00' }}</span>
+                <span class="recon-val" id="verifiedTotalDisplay">₹{{ bill.verified_net_total or bill.invoice_total or
+                  '0.00' }}</span>
               </div>
               <div style="display:flex; align-items:center; gap:8px;">
                 <span class="recon-pill recon-ok" id="reconBadge">
                   ● Live Reconciliation Active
                 </span>
-                <button type="button" id="btnAutoBalance" onclick="autoBalancePaise()" style="display:none; font-size:11.5px; padding:4px 9px; background:#eff6ff; border:1px solid #bfdbfe; color:#2563eb; border-radius:6px; cursor:pointer; font-weight:600;">
+                <button type="button" id="btnAutoBalance" onclick="autoBalancePaise()"
+                  style="display:none; font-size:11.5px; padding:4px 9px; background:#eff6ff; border:1px solid #bfdbfe; color:#2563eb; border-radius:6px; cursor:pointer; font-weight:600;">
                   ⚡ Balance Paise
                 </button>
               </div>
@@ -1075,7 +1165,9 @@
           <div class="panel-header" style="border-color: #fee2e2;">
             <h2 class="panel-title" style="color: var(--danger);">
               <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                </path>
               </svg>
               Reject Bill Permanently
             </h2>
@@ -1087,11 +1179,13 @@
             <div class="form-grid-2">
               <div class="form-group">
                 <label>Reviewer Name <span class="req">*</span></label>
-                <input type="text" name="reviewer" value="{{ bill.reviewer or 'store_manager' }}" required placeholder="e.g. store_manager">
+                <input type="text" name="reviewer" value="{{ bill.reviewer or 'store_manager' }}" required
+                  placeholder="e.g. store_manager">
               </div>
               <div class="form-group">
                 <label>Rejection Reason <span class="req">*</span></label>
-                <input type="text" name="reason" placeholder="e.g. Blurred photo, incomplete invoice, wrong vendor" required>
+                <input type="text" name="reason" placeholder="e.g. Blurred photo, incomplete invoice, wrong vendor"
+                  required>
               </div>
             </div>
 
@@ -1179,7 +1273,7 @@
     // Submit loading feedback
     const approvalForm = document.getElementById('approvalForm');
     if (approvalForm) {
-      approvalForm.addEventListener('submit', function() {
+      approvalForm.addEventListener('submit', function () {
         const btn = document.getElementById('btnApproveBill');
         if (btn) {
           btn.disabled = true;
@@ -1212,4 +1306,5 @@
     }
   </script>
 </body>
+
 </html>

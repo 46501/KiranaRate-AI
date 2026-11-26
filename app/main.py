@@ -1007,6 +1007,43 @@ async def ui_quick_approve_bill(
     )
 
 
+@app.post("/ui/bills/{bill_id}/retry")
+async def ui_retry_bill(
+    request: Request,
+    bill_id: str,
+    csrf_token: Optional[str] = Form(None),
+):
+    """Handle HTML form submission to retry a failed or stuck bill scan."""
+    user = _require_ui_session(request)
+    if not user:
+        return RedirectResponse(url="/ui/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    cfg: Settings = getattr(request.app.state, "settings", settings)
+    if cfg.is_auth_enabled:
+        token = csrf_token or request.headers.get("X-CSRF-Token")
+        session_csrf = request.session.get("csrf_token") if hasattr(request, "session") else None
+        if not verify_csrf_token(session_csrf, token):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing CSRF token")
+
+    store: SQLiteStore = request.app.state.store
+    bill = store.get_bill(bill_id)
+    if not bill:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bill not found")
+
+    # Purge any partial review lines and reset to QUEUED
+    store.delete_review_lines(bill_id)
+    store.update_bill(bill_id, status=BillStatus.QUEUED, notes=None)
+
+    # Trigger scan worker immediately
+    engine: WorkflowEngine = request.app.state.engine
+    await engine.run_scan_worker()
+
+    return RedirectResponse(
+        url=f"/ui/bills/{bill_id}?msg=scan_retried",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
 @app.post("/ui/workers/run/{stage}")
 async def ui_trigger_worker(
     request: Request,
