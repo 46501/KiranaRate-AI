@@ -59,7 +59,7 @@ def test_settings() -> Settings:
         whatsapp_owner_number="919999999999",
         whatsapp_allowlist=["919876543210"],
         gemini_api_key="test_gemini_key",
-        gemini_model="gemini-1.5-flash",
+        gemini_model="gemini-3.8-flash",
         storage_backend="sqlite",
         sqlite_db_path=":memory:",
         mock_whatsapp=True,

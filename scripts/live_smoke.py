@@ -42,7 +42,7 @@ from app.models import (
     SupplierActive,
 )
 from app.schemas import AlertParams
-from app.services.gemini_scanner import GeminiScanner, MockGeminiScanner
+from app.services.gemini_scanner import GeminiScanner, MockGeminiScanner, mask_api_key
 from app.services.whatsapp import MockWhatsAppClient, WhatsAppClient
 from app.services.workflow_engine import WorkflowEngine
 from app.storage.sqlite_store import SQLiteStore
@@ -310,16 +310,19 @@ async def run_live_connectivity_probe() -> bool:
         print(f"  ✓ GEMINI_API_KEY detected (Length: {len(cfg.gemini_api_key)})")
         print(f"  ✓ Model: {cfg.gemini_model}")
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=cfg.gemini_api_key)
-            model = genai.GenerativeModel(cfg.gemini_model)
+            from google import genai
+            client = genai.Client(api_key=cfg.gemini_api_key)
             # Lightweight test call
             print("  ... Probing Gemini API with quick ping...")
-            resp = await model.generate_content_async("Ping. Reply with 'PONG' only.")
+            resp = await client.aio.models.generate_content(
+                model=cfg.gemini_model,
+                contents="Ping. Reply with 'PONG' only.",
+            )
             print(f"  ✓ Gemini API Connectivity PASS: Response={resp.text.strip()[:30]!r}")
             gemini_live = True
         except Exception as exc:
-            print(f"  ✕ Gemini API Probe FAILED: {exc}")
+            sanitized_err = mask_api_key(str(exc), cfg.gemini_api_key)
+            print(f"  ✕ Gemini API Probe FAILED: {sanitized_err}")
             all_ok = False
             gemini_live = False
 
@@ -354,11 +357,13 @@ async def run_live_connectivity_probe() -> bool:
                     print(f"  ✓ Meta Graph API Probe PASS: Phone={display_phone} Name={verified_name}")
                     whatsapp_live = True
                 else:
-                    print(f"  ✕ Meta Graph API Probe FAILED: HTTP {res.status_code} - {res.text}")
+                    sanitized_body = mask_api_key(res.text, wa_token)
+                    print(f"  ✕ Meta Graph API Probe FAILED: HTTP {res.status_code} - {sanitized_body}")
                     all_ok = False
                     whatsapp_live = False
         except Exception as exc:
-            print(f"  ✕ Meta Graph API Connection Error: {exc}")
+            sanitized_err = mask_api_key(str(exc), wa_token)
+            print(f"  ✕ Meta Graph API Connection Error: {sanitized_err}")
             all_ok = False
             whatsapp_live = False
 

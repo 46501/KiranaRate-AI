@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     """API key obtained from Google AI Studio."""
 
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-3.8-flash"
     """Gemini model identifier used for bill image scanning."""
 
     gemini_request_timeout: int = 30

@@ -40,7 +40,7 @@ from app.models import (
     Reviewed,
 )
 from app.services.gemini_scanner import GeminiScanner, MockGeminiScanner
-from app.services.security import validate_image_magic_bytes
+from app.services.security import sanitize_user_facing_error, validate_image_magic_bytes
 from app.services.whatsapp import (
     BillIntakeEvent,
     MockWhatsAppClient,
@@ -451,8 +451,9 @@ class WorkflowEngine:
             )
 
         except Exception as exc:
-            error_msg = f"Scan error: {exc}"
-            logger.exception("Scan failed for bill_id=%r: %s", bill_id, exc)
+            safe_err = sanitize_user_facing_error(str(exc))
+            error_msg = f"Scan error: {safe_err}"
+            logger.exception("Scan failed for bill_id=%r: %s", bill_id, safe_err)
             # Record the error in notes; leave bill in SCANNING state
             self._store.update_bill(bill_id, notes=error_msg)
 

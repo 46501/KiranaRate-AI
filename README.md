@@ -219,7 +219,7 @@ To connect live Meta WhatsApp Cloud API and Google Gemini Vision:
      ```env
      MOCK_GEMINI=false
      GEMINI_API_KEY=your_actual_gemini_api_key
-     GEMINI_MODEL=gemini-1.5-flash
+     GEMINI_MODEL=gemini-3.8-flash
      ```
 
 2. **Meta WhatsApp Cloud API:**
