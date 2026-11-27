@@ -277,6 +277,10 @@ class BaseStore(ABC):
         """Persist a new User record."""
         pass
 
+    def get_user_by_id(self, user_id: str) -> Optional[User]:
+        """Return User by exact user_id, or None if not found."""
+        return None
+
     def get_user_by_username(self, username: str) -> Optional[User]:
         """Return User by username, or None if not found."""
         return None
@@ -288,6 +292,18 @@ class BaseStore(ABC):
     def get_user_by_identifier(self, identifier: str) -> Optional[User]:
         """Return User matching either username or email, or None if not found."""
         return None
+
+    def update_user_password(self, user_id: str, password_hash: str) -> None:
+        """Update password hash for a user."""
+        pass
+
+    def update_user_email(self, user_id: str, email: str) -> None:
+        """Update email address for a user."""
+        pass
+
+    def delete_user(self, user_id: str) -> None:
+        """Remove a user by user_id."""
+        pass
 
     def count_users(self) -> int:
         """Return total number of registered users."""

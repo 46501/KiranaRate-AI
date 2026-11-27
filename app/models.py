@@ -360,3 +360,4 @@ class User:
     password_hash: str
     role: str = "admin"
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: Optional[datetime] = None

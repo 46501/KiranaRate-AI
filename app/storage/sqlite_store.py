@@ -206,6 +206,7 @@ def _row_to_alert(row: sqlite3.Row) -> Alert:
 
 def _row_to_user(row: sqlite3.Row) -> User:
     created = _str_to_dt(row["created_at"]) or datetime.now(timezone.utc)
+    updated = _str_to_dt(row["updated_at"]) if "updated_at" in row.keys() and row["updated_at"] else None
     return User(
         user_id=row["user_id"],
         username=row["username"],
@@ -213,6 +214,7 @@ def _row_to_user(row: sqlite3.Row) -> User:
         password_hash=row["password_hash"],
         role=row["role"] if "role" in row.keys() else "admin",
         created_at=created,
+        updated_at=updated,
     )
 
 
@@ -442,7 +444,8 @@ class SQLiteStore(BaseStore):
                     email         TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
                     role          TEXT NOT NULL DEFAULT 'admin',
-                    created_at    TEXT NOT NULL
+                    created_at    TEXT NOT NULL,
+                    updated_at    TEXT
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_users_username
@@ -450,6 +453,12 @@ class SQLiteStore(BaseStore):
                 CREATE INDEX IF NOT EXISTS idx_users_email
                     ON users (email);
             """)
+
+            # Safe migration for updated_at column on existing deployments
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN updated_at TEXT")
+            except sqlite3.OperationalError:
+                pass
 
     def seed_demo_data(self) -> None:
         """
@@ -1069,6 +1078,18 @@ class SQLiteStore(BaseStore):
                 ),
             )
 
+    def get_user_by_id(self, user_id: str) -> Optional[User]:
+        """Return User by exact user_id, or None."""
+        if not user_id:
+            return None
+        conn = self._get_conn()
+        cur = conn.execute(
+            "SELECT * FROM users WHERE user_id = ?",
+            (user_id.strip(),),
+        )
+        row = cur.fetchone()
+        return _row_to_user(row) if row else None
+
     def get_user_by_username(self, username: str) -> Optional[User]:
         """Return User by exact (case-insensitive) username, or None."""
         if not username:
@@ -1105,6 +1126,42 @@ class SQLiteStore(BaseStore):
         )
         row = cur.fetchone()
         return _row_to_user(row) if row else None
+
+    def update_user_password(self, user_id: str, password_hash: str) -> None:
+        """Update password hash and updated_at timestamp for a user."""
+        if not user_id or not password_hash:
+            raise ValueError("user_id and password_hash are required")
+        conn = self._get_conn()
+        now_str = datetime.now(timezone.utc).isoformat()
+        with conn:
+            cur = conn.execute(
+                "UPDATE users SET password_hash = ?, updated_at = ? WHERE user_id = ?",
+                (password_hash, now_str, user_id.strip()),
+            )
+            if cur.rowcount == 0:
+                raise KeyError(f"User not found: {user_id!r}")
+
+    def update_user_email(self, user_id: str, email: str) -> None:
+        """Update email address and updated_at timestamp for a user."""
+        if not user_id or not email:
+            raise ValueError("user_id and email are required")
+        conn = self._get_conn()
+        now_str = datetime.now(timezone.utc).isoformat()
+        with conn:
+            cur = conn.execute(
+                "UPDATE users SET email = ?, updated_at = ? WHERE user_id = ?",
+                (email.strip().lower(), now_str, user_id.strip()),
+            )
+            if cur.rowcount == 0:
+                raise KeyError(f"User not found: {user_id!r}")
+
+    def delete_user(self, user_id: str) -> None:
+        """Delete a user by user_id."""
+        if not user_id:
+            return
+        conn = self._get_conn()
+        with conn:
+            conn.execute("DELETE FROM users WHERE user_id = ?", (user_id.strip(),))
 
     def count_users(self) -> int:
         """Return total count of registered users."""

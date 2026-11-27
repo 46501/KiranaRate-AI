@@ -1023,13 +1023,13 @@
         <span>KiranaIQ Engine Active</span>
       </div>
 
-      <div class="user-profile-strip">
-        <div class="user-avatar">SM</div>
+      <a href="/ui/account" class="user-profile-strip" style="text-decoration:none; color:inherit;" title="Manage administrator profile & security settings">
+        <div class="user-avatar">{{ (current_user[0]|upper) if current_user else 'AD' }}</div>
         <div class="user-meta">
-          <span class="user-name">Kirana Store Admin</span>
-          <span class="user-role">store_manager · Pilot</span>
+          <span class="user-name">{{ current_user or 'Kirana Store Admin' }}</span>
+          <span class="user-role">{{ current_user_role or 'admin' }} · Settings ⚙️</span>
         </div>
-      </div>
+      </a>
     </div>
   </aside>
 
@@ -1077,6 +1077,7 @@
         <a href="/workers/status" target="_blank" class="btn btn-secondary">Workers Status</a>
         <a href="/docs" target="_blank" class="btn btn-secondary">API Docs</a>
         {% if current_user %}
+        <a href="/ui/account" class="btn btn-secondary" style="text-decoration:none; font-weight:600; padding:6px 12px; border-radius:6px; font-size:12px;" title="Manage administrator profile & credentials">Account</a>
         <a href="/ui/logout" class="btn" style="background:#fef2f2; border:1px solid #fecaca; color:#dc2626; text-decoration:none; font-weight:600; padding:6px 12px; border-radius:6px; font-size:12px;" title="Sign out of KiranaIQ session">Sign Out</a>
         {% endif %}
       </div>
